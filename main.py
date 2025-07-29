@@ -56,6 +56,29 @@ class SalaryBot:
             }
         return self.data[user_id]
 
+    def format_hours_minutes(self, total_hours: float) -> str:
+        """Форматирование времени в формат 'Xч Yм'"""
+        hours = int(total_hours)
+        minutes = int((total_hours - hours) * 60)
+        
+        if minutes == 0:
+            return f"{hours}ч"
+        else:
+            return f"{hours}ч {minutes}м"
+
+    def get_russian_month_year(self, date) -> str:
+        """Получение русского названия месяца и года"""
+        months = {
+            'January': 'январь', 'February': 'февраль', 'March': 'март',
+            'April': 'апрель', 'May': 'май', 'June': 'июнь',
+            'July': 'июль', 'August': 'август', 'September': 'сентябрь',
+            'October': 'октябрь', 'November': 'ноябрь', 'December': 'декабрь'
+        }
+        english_month = date.strftime('%B')
+        russian_month = months.get(english_month, english_month.lower())
+        year = date.strftime('%Y')
+        return f"{russian_month} {year}"
+
     def setup_handlers(self):
         """Настройка обработчиков команд"""
 
@@ -184,9 +207,9 @@ class SalaryBot:
 
                 response = (
                     f"✅ Время добавлено!\n\n"
-                    f"⏰ Отработано: {hours}ч {minutes}м ({total_hours:.2f}ч)\n"
+                    f"⏰ Отработано: {hours}ч {minutes}м ({self.format_hours_minutes(total_hours)})\n"
                     f"💰 Заработано: {earnings:.2f} руб\n"
-                    f"📊 Всего за сегодня: {user_data['work_sessions'][today]['total_hours']:.2f}ч = "
+                    f"📊 Всего за сегодня: {self.format_hours_minutes(user_data['work_sessions'][today]['total_hours'])} = "
                     f"{user_data['work_sessions'][today]['total_earnings']:.2f} руб"
                 )
 
@@ -206,9 +229,8 @@ class SalaryBot:
             if today in user_data["work_sessions"]:
                 session = user_data["work_sessions"][today]
                 response = (
-
                     f"📊 Заработок за сегодня ({datetime.now().strftime('%d.%m.%Y')}):\n\n"
-                    f"⏰ Отработано: {session['total_hours']:.2f} часов\n"
+                    f"⏰ Отработано: {self.format_hours_minutes(session['total_hours'])}\n"
                     f"💰 Заработано: {session['total_earnings']:.2f} руб"
                 )
             else:
@@ -227,7 +249,7 @@ class SalaryBot:
                 session = user_data["work_sessions"][yesterday]
                 response = (
                     f"📊 Заработок за вчера ({(datetime.now() - timedelta(days=1)).strftime('%d.%m.%Y')}):\n\n"
-                    f"⏰ Отработано: {session['total_hours']:.2f} часов\n"
+                    f"⏰ Отработано: {self.format_hours_minutes(session['total_hours'])}\n"
                     f"💰 Заработано: {session['total_earnings']:.2f} руб"
                 )
             else:
@@ -263,7 +285,7 @@ class SalaryBot:
                 response = (
                     f"📊 Заработок за неделю (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}):\n\n"
                     f"📅 Рабочих дней: {days_worked}\n"
-                    f"⏰ Всего отработано: {total_hours:.2f} часов\n"
+                    f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
                     f"💰 Всего заработано: {total_earnings:.2f} руб\n"
                     f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
                 )
@@ -299,7 +321,7 @@ class SalaryBot:
                     earnings = session["total_earnings"]
                     total_hours += hours
                     total_earnings += earnings
-                    response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): {hours:.2f}ч = {earnings:.2f} руб")
+                    response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): {self.format_hours_minutes(hours)} = {earnings:.2f} руб")
                 else:
                     response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): 0ч = 0 руб")
                 
@@ -310,7 +332,7 @@ class SalaryBot:
                 response_lines.extend([
                     "",
                     f"📊 Итого за неделю:",
-                    f"⏰ Всего отработано: {total_hours:.2f} часов",
+                    f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}",
                     f"💰 Всего заработано: {total_earnings:.2f} руб"
                 ])
             else:
@@ -340,7 +362,7 @@ class SalaryBot:
                 response = (
                     f"📊 Заработок за месяц:\n\n"
                     f"📅 Рабочих дней: {days_worked}\n"
-                    f"⏰ Всего отработано: {total_hours:.2f} часов\n"
+                    f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
                     f"💰 Всего заработано: {total_earnings:.2f} руб\n"
                     f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
                 )
@@ -410,23 +432,23 @@ class SalaryBot:
                 week_number += 1
 
             if weeks_data:
-                response_lines = [f"📊 Заработок по неделям в {today.strftime('%B %Y')}:\n"]
+                response_lines = [f"📊 Заработок по неделям в {self.get_russian_month_year(today)}:\n"]
                 
                 for week in weeks_data:
                     response_lines.append(
                         f"📅 Неделя {week['number']} ({week['start'].strftime('%d.%m')} - {week['end'].strftime('%d.%m')}): "
-                        f"{week['hours']:.2f}ч = {week['earnings']:.2f} руб"
+                        f"{self.format_hours_minutes(week['hours'])} = {week['earnings']:.2f} руб"
                     )
                 
                 response_lines.extend([
                     "",
                     f"📊 Итого за месяц:",
                     f"📅 Недель с работой: {len(weeks_data)}",
-                    f"⏰ Всего отработано: {total_month_hours:.2f} часов",
+                    f"⏰ Всего отработано: {self.format_hours_minutes(total_month_hours)}",
                     f"💰 Всего заработано: {total_month_earnings:.2f} руб"
                 ])
             else:
-                response_lines = [f"📊 В {today.strftime('%B %Y')} нет записей о работе"]
+                response_lines = [f"📊 В {self.get_russian_month_year(today)} нет записей о работе"]
 
             await message.answer("\n".join(response_lines))
 
