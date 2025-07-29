@@ -1,0 +1,19 @@
+{
+  "505483484": {
+    "rate": 300.0,
+    "work_sessions": {
+      "2025-07-29": {
+        "total_hours": 4.533333333333333,
+        "total_earnings": 1360.0,
+        "sessions": [
+          {
+            "hours": 4,
+            "minutes": 32,
+            "earnings": 1360.0,
+            "timestamp": "2025-07-29T21:05:38.204244"
+          }
+        ]
+      }
+    }
+  }
+}
