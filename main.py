@@ -72,8 +72,10 @@ class SalaryBot:
                 "/addtime - добавить отработанное время\n"
                 "/today - заработок за сегодня\n"
                 "/yesterday - заработок за вчера\n"
-                "/week - заработок за неделю\n"
+                "/week - заработок за неделю (с понедельника)\n"
+                "/weekdetails - детальный заработок по дням недели\n"
                 "/month - заработок за месяц\n"
+                "/monthweeks - заработок по неделям в месяце\n"
                 "/help - показать эту справку\n\n"
             )
 
@@ -93,8 +95,10 @@ class SalaryBot:
                 "/addtime - добавить отработанное время\n"
                 "/today - заработок за сегодня\n"
                 "/yesterday - заработок за вчера\n"
-                "/week - заработок за неделю\n"
-                "/month - заработок за месяц\n\n"
+                "/week - заработок за неделю (с понедельника)\n"
+                "/weekdetails - детальный заработок по дням недели\n"
+                "/month - заработок за месяц\n"
+                "/monthweeks - заработок по неделям в месяце\n\n"
                 "💡 Для добавления времени используйте формат: ЧАСЫ МИНУТЫ\n"
                 "Например: 8 30 (означает 8 часов 30 минут)"
             )
@@ -236,31 +240,83 @@ class SalaryBot:
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
 
-            # Последние 7 дней
+            # Найти понедельник текущей недели
+            today = datetime.now()
+            monday = today - timedelta(days=today.weekday())
+            
             total_hours = 0
             total_earnings = 0
             days_worked = 0
 
-            for i in range(7):
-                date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
-                if date in user_data["work_sessions"]:
-                    session = user_data["work_sessions"][date]
+            # Подсчет с понедельника до сегодня
+            current_date = monday
+            while current_date <= today:
+                date_str = current_date.strftime("%Y-%m-%d")
+                if date_str in user_data["work_sessions"]:
+                    session = user_data["work_sessions"][date_str]
                     total_hours += session["total_hours"]
                     total_earnings += session["total_earnings"]
                     days_worked += 1
+                current_date += timedelta(days=1)
 
             if days_worked > 0:
                 response = (
-                    f"📊 Заработок за неделю:\n\n"
+                    f"📊 Заработок за неделю (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}):\n\n"
                     f"📅 Рабочих дней: {days_worked}\n"
                     f"⏰ Всего отработано: {total_hours:.2f} часов\n"
                     f"💰 Всего заработано: {total_earnings:.2f} руб\n"
                     f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
                 )
             else:
-                response = "📊 За последнюю неделю нет записей о работе"
+                response = f"📊 На этой неделе (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}) нет записей о работе"
 
             await message.answer(response)
+
+        @self.dp.message(Command("weekdetails"))
+        async def week_details_command(message: Message):
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+
+            # Найти понедельник текущей недели
+            today = datetime.now()
+            monday = today - timedelta(days=today.weekday())
+            
+            days_names = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+            total_hours = 0
+            total_earnings = 0
+            response_lines = [f"📊 Детальный заработок за неделю (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}):\n"]
+
+            # Проход по каждому дню недели
+            current_date = monday
+            day_index = 0
+            while current_date <= today:
+                date_str = current_date.strftime("%Y-%m-%d")
+                day_name = days_names[day_index]
+                
+                if date_str in user_data["work_sessions"]:
+                    session = user_data["work_sessions"][date_str]
+                    hours = session["total_hours"]
+                    earnings = session["total_earnings"]
+                    total_hours += hours
+                    total_earnings += earnings
+                    response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): {hours:.2f}ч = {earnings:.2f} руб")
+                else:
+                    response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): 0ч = 0 руб")
+                
+                current_date += timedelta(days=1)
+                day_index += 1
+
+            if total_hours > 0:
+                response_lines.extend([
+                    "",
+                    f"📊 Итого за неделю:",
+                    f"⏰ Всего отработано: {total_hours:.2f} часов",
+                    f"💰 Всего заработано: {total_earnings:.2f} руб"
+                ])
+            else:
+                response_lines.extend(["", "📊 На этой неделе нет записей о работе"])
+
+            await message.answer("\n".join(response_lines))
 
         @self.dp.message(Command("month"))
         async def month_command(message: Message):
@@ -292,6 +348,87 @@ class SalaryBot:
                 response = "📊 За последний месяц нет записей о работе"
 
             await message.answer(response)
+
+        @self.dp.message(Command("monthweeks"))
+        async def month_weeks_command(message: Message):
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+
+            # Получить первый день текущего месяца
+            today = datetime.now()
+            first_day_of_month = today.replace(day=1)
+            
+            # Найти понедельник первой недели месяца
+            first_monday = first_day_of_month - timedelta(days=first_day_of_month.weekday())
+            
+            weeks_data = []
+            total_month_hours = 0
+            total_month_earnings = 0
+            week_number = 1
+            
+            current_monday = first_monday
+            
+            # Проходим по неделям месяца
+            while current_monday.month <= today.month and current_monday <= today:
+                # Определяем конец недели (воскресенье)
+                sunday = current_monday + timedelta(days=6)
+                
+                # Если воскресенье в следующем месяце, ограничиваем последним днем текущего месяца
+                if sunday.month > today.month:
+                    last_day_of_month = today.replace(day=1, month=today.month+1) - timedelta(days=1) if today.month < 12 else today.replace(day=31)
+                    sunday = min(sunday, last_day_of_month)
+                
+                # Если воскресенье больше сегодня, ограничиваем сегодняшним днем
+                if sunday > today:
+                    sunday = today
+                
+                week_hours = 0
+                week_earnings = 0
+                
+                # Подсчет для текущей недели
+                current_date = current_monday
+                while current_date <= sunday:
+                    date_str = current_date.strftime("%Y-%m-%d")
+                    if date_str in user_data["work_sessions"]:
+                        session = user_data["work_sessions"][date_str]
+                        week_hours += session["total_hours"]
+                        week_earnings += session["total_earnings"]
+                    current_date += timedelta(days=1)
+                
+                if week_hours > 0:
+                    weeks_data.append({
+                        'number': week_number,
+                        'start': current_monday,
+                        'end': sunday,
+                        'hours': week_hours,
+                        'earnings': week_earnings
+                    })
+                    total_month_hours += week_hours
+                    total_month_earnings += week_earnings
+                
+                current_monday += timedelta(days=7)
+                week_number += 1
+
+            if weeks_data:
+                response_lines = [f"📊 Заработок по неделям в {today.strftime('%B %Y')}:\n"]
+                
+                for week in weeks_data:
+                    response_lines.append(
+                        f"📅 Неделя {week['number']} ({week['start'].strftime('%d.%m')} - {week['end'].strftime('%d.%m')}): "
+                        f"{week['hours']:.2f}ч = {week['earnings']:.2f} руб"
+                    )
+                
+                response_lines.extend([
+                    "",
+                    f"📊 Итого за месяц:",
+                    f"📅 Недель с работой: {len(weeks_data)}",
+                    f"⏰ Всего отработано: {total_month_hours:.2f} часов",
+                    f"💰 Всего заработано: {total_month_earnings:.2f} руб"
+                ])
+            else:
+                response_lines = [f"📊 В {today.strftime('%B %Y')} нет записей о работе"]
+
+            await message.answer("\n".join(response_lines))
 
     async def start_bot(self):
         """Запуск бота"""
