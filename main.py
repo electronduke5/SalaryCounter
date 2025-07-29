@@ -376,40 +376,43 @@ class SalaryBot:
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
 
-            # Получить первый день текущего месяца
+            # Получить первый и последний день текущего месяца
             today = datetime.now()
             first_day_of_month = today.replace(day=1)
             
-            # Найти понедельник первой недели месяца
-            first_monday = first_day_of_month - timedelta(days=first_day_of_month.weekday())
+            # Последний день месяца
+            if today.month == 12:
+                last_day_of_month = today.replace(day=31)
+            else:
+                last_day_of_month = today.replace(day=1, month=today.month+1) - timedelta(days=1)
             
             weeks_data = []
             total_month_hours = 0
             total_month_earnings = 0
             week_number = 1
             
-            current_monday = first_monday
+            current_start = first_day_of_month
             
-            # Проходим по неделям месяца
-            while current_monday.month <= today.month and current_monday <= today:
-                # Определяем конец недели (воскресенье)
-                sunday = current_monday + timedelta(days=6)
+            # Проходим по неделям внутри месяца
+            while current_start <= today and current_start.month == today.month:
+                # Определяем конец недели
+                if current_start == first_day_of_month:
+                    # Первая неделя: от 1 числа до ближайшего воскресенья
+                    days_until_sunday = (6 - current_start.weekday()) % 7
+                    week_end = current_start + timedelta(days=days_until_sunday)
+                else:
+                    # Обычная неделя: 7 дней от понедельника
+                    week_end = current_start + timedelta(days=6)
                 
-                # Если воскресенье в следующем месяце, ограничиваем последним днем текущего месяца
-                if sunday.month > today.month:
-                    last_day_of_month = today.replace(day=1, month=today.month+1) - timedelta(days=1) if today.month < 12 else today.replace(day=31)
-                    sunday = min(sunday, last_day_of_month)
-                
-                # Если воскресенье больше сегодня, ограничиваем сегодняшним днем
-                if sunday > today:
-                    sunday = today
+                # Ограничиваем концом месяца и сегодняшним днем
+                week_end = min(week_end, last_day_of_month, today)
                 
                 week_hours = 0
                 week_earnings = 0
                 
                 # Подсчет для текущей недели
-                current_date = current_monday
-                while current_date <= sunday:
+                current_date = current_start
+                while current_date <= week_end:
                     date_str = current_date.strftime("%Y-%m-%d")
                     if date_str in user_data["work_sessions"]:
                         session = user_data["work_sessions"][date_str]
@@ -420,15 +423,23 @@ class SalaryBot:
                 if week_hours > 0:
                     weeks_data.append({
                         'number': week_number,
-                        'start': current_monday,
-                        'end': sunday,
+                        'start': current_start,
+                        'end': week_end,
                         'hours': week_hours,
                         'earnings': week_earnings
                     })
                     total_month_hours += week_hours
                     total_month_earnings += week_earnings
                 
-                current_monday += timedelta(days=7)
+                # Переход к следующей неделе
+                if current_start == first_day_of_month:
+                    # После первой недели переходим к понедельнику
+                    days_until_sunday = (6 - current_start.weekday()) % 7
+                    current_start = current_start + timedelta(days=days_until_sunday + 1)
+                else:
+                    # Обычный переход на следующий понедельник
+                    current_start += timedelta(days=7)
+                
                 week_number += 1
 
             if weeks_data:
