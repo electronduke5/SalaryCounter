@@ -99,6 +99,7 @@ class SalaryBot:
                 "/weekdetails - детальный заработок по дням недели\n"
                 "/month - заработок за месяц\n"
                 "/monthweeks - заработок по неделям в месяце\n"
+                "/year - заработок по месяцам в году\n"
                 "/help - показать эту справку\n\n"
             )
 
@@ -121,7 +122,8 @@ class SalaryBot:
                 "/week - заработок за неделю (с понедельника)\n"
                 "/weekdetails - детальный заработок по дням недели\n"
                 "/month - заработок за месяц\n"
-                "/monthweeks - заработок по неделям в месяце\n\n"
+                "/monthweeks - заработок по неделям в месяце\n"
+                "/year - заработок по месяцам в году\n\n"
                 "💡 Для добавления времени используйте формат: ЧАСЫ МИНУТЫ\n"
                 "Например: 8 30 (означает 8 часов 30 минут)"
             )
@@ -460,6 +462,70 @@ class SalaryBot:
                 ])
             else:
                 response_lines = [f"📊 В {self.get_russian_month_year(today)} нет записей о работе"]
+
+            await message.answer("\n".join(response_lines))
+
+        @self.dp.message(Command("year"))
+        async def year_command(message: Message):
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+
+            # Получить текущий год
+            current_year = datetime.now().year
+            
+            # Словарь для хранения данных по месяцам
+            months_data = {}
+            total_year_hours = 0
+            total_year_earnings = 0
+            
+            # Проходим по всем рабочим сессиям пользователя
+            for date_str, session in user_data["work_sessions"].items():
+                try:
+                    session_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    
+                    # Проверяем, что дата относится к текущему году
+                    if session_date.year == current_year:
+                        # Получаем ключ месяца в формате YYYY-MM
+                        month_key = session_date.strftime("%Y-%m")
+                        
+                        if month_key not in months_data:
+                            months_data[month_key] = {
+                                'hours': 0,
+                                'earnings': 0,
+                                'date_obj': session_date  # Для сортировки
+                            }
+                        
+                        months_data[month_key]['hours'] += session["total_hours"]
+                        months_data[month_key]['earnings'] += session["total_earnings"]
+                        total_year_hours += session["total_hours"]
+                        total_year_earnings += session["total_earnings"]
+                        
+                except ValueError:
+                    # Пропускаем некорректные даты
+                    continue
+            
+            if months_data:
+                response_lines = [f"📊 Заработок по месяцам в {current_year} году:\n"]
+                
+                # Сортируем месяцы по дате
+                sorted_months = sorted(months_data.items(), key=lambda x: x[1]['date_obj'])
+                
+                for month_key, data in sorted_months:
+                    month_name = self.get_russian_month_year(data['date_obj'])
+                    response_lines.append(
+                        f"📅 {month_name}: {self.format_hours_minutes(data['hours'])} = {data['earnings']:.2f} руб"
+                    )
+                
+                response_lines.extend([
+                    "",
+                    f"📊 Итого за год:",
+                    f"📅 Месяцев с работой: {len(months_data)}",
+                    f"⏰ Всего отработано: {self.format_hours_minutes(total_year_hours)}",
+                    f"💰 Всего заработано: {total_year_earnings:.2f} руб",
+                    f"📈 Среднее в месяц: {total_year_earnings / len(months_data):.2f} руб"
+                ])
+            else:
+                response_lines = [f"📊 В {current_year} году нет записей о работе"]
 
             await message.answer("\n".join(response_lines))
 
