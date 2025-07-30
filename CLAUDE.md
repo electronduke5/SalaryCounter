@@ -38,6 +38,7 @@ The application follows a single-file architecture with the main `SalaryBot` cla
 
 ### Available Commands
 
+#### Basic Commands
 - `/start` - Welcome message and current rate display
 - `/setrate` - Set hourly rate (enters FSM state)
 - `/addtime` - Add work time in "hours minutes" format (enters FSM state)  
@@ -46,5 +47,58 @@ The application follows a single-file architecture with the main `SalaryBot` cla
 - `/week` - Show last 7 days summary
 - `/month` - Show last 30 days summary
 - `/help` - Command reference
+
+#### ClickUp Integration
+- `/clickup_setup` - Step-by-step ClickUp integration setup
+- `/clickup_token` - Set Personal API Token
+- `/clickup_workspace` - Set Workspace ID
+- `/syncclickup` - Sync today's time entries
+- `/synclast [days]` - Sync last N days (default 7)
+- `/clickupstatus` - Show integration status and active timers
+
+#### Task Management
+- `/tasks` - Step-by-step task navigation: Projects → Status → Tasks with interactive controls
+- `/active_task` - Show currently active task with running timer
+
+#### Analytics
+- `/tasksummary [period]` - Task summary (week/today/yesterday/month/N days)
+- `/monthweeks` - Weekly breakdown for current month
+- `/weekdetails` - Detailed daily breakdown for current week
+- `/year` - Monthly breakdown for current year
+
+### Task Management Features
+
+#### Step-by-step Navigation Interface
+The `/tasks` command provides a structured navigation flow:
+
+1. **Project Selection** - Choose from available projects with task counts
+2. **Status Filter** - Select task status: All, Open, In Progress, Review, Done, Complete
+3. **Task List** - View filtered tasks with interactive controls
+
+#### Interactive Task Controls
+Each task includes inline buttons:
+- **📋 Инфо** - View detailed task information (name, description, assignee, due date, project)
+- **⏱️ Старт** - Start ClickUp timer for the task
+- **⏹️ Стоп** - Stop running timer
+- **Status buttons** - Change task status in ClickUp (Open, In Progress, Review, Done, Complete)
+
+#### Navigation Features
+- **🔙 Назад** buttons for easy navigation between levels
+- **Back to Projects** - Return to project selection
+- **Back to Status** - Return to status selection for current project
+- Breadcrumb-style navigation preserves context
+
+#### Supported ClickUp Statuses
+- Open (📂)
+- In Progress (🔄)
+- Review (👀)
+- Done (✅)
+- Complete (🏁)
+
+#### Timer Management
+- Start/stop timers directly from Telegram
+- View active task with running time
+- Automatic synchronization with ClickUp time tracking
+- Integration with existing salary calculation system
 
 The bot uses Russian language for user interactions and expects time input in "HOURS MINUTES" format (e.g., "8 30" for 8 hours 30 minutes).
