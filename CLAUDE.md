@@ -69,11 +69,13 @@ The application follows a single-file architecture with the main `SalaryBot` cla
 ### Task Management Features
 
 #### Step-by-step Navigation Interface
-The `/tasks` command provides a structured navigation flow:
+The `/tasks` command provides a structured navigation flow following ClickUp hierarchy:
 
-1. **Project Selection** - Choose from available projects with task counts
-2. **Status Filter** - Select task status: All, Open, In Progress, Review, Done, Complete
-3. **Task List** - View filtered tasks with interactive controls
+1. **Spaces** - Choose from available workspaces/teams
+2. **Folders** - Select folder within the space (if any exist)
+3. **Lists** - Choose specific project/list within folder or space
+4. **Status Filter** - Select task status: All, Open, In Progress, Review, Done, Complete
+5. **Task List** - View tasks assigned to you with interactive controls
 
 #### Interactive Task Controls
 Each task includes inline buttons:
@@ -84,9 +86,17 @@ Each task includes inline buttons:
 
 #### Navigation Features
 - **🔙 Назад** buttons for easy navigation between levels
-- **Back to Projects** - Return to project selection
-- **Back to Status** - Return to status selection for current project
-- Breadcrumb-style navigation preserves context
+- **Back to Spaces** - Return to workspace selection
+- **Back to Folders** - Return to folder selection within space
+- **Back to Lists** - Return to list selection within folder
+- **Back to Status** - Return to status selection for current list
+- Hierarchical navigation following ClickUp structure
+
+#### Performance Optimizations
+- **Minimal API Requests** - Only loads data when needed at each navigation level
+- **User Filtering** - Shows only tasks assigned to current user (assignee filter)
+- **On-demand Loading** - Spaces → Folders → Lists → Tasks loaded progressively
+- **Efficient Caching** - User information cached during ClickUp setup
 
 #### Supported ClickUp Statuses
 - Open (📂)
