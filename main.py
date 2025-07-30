@@ -2,8 +2,10 @@ import asyncio
 import json
 import os
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
+import aiohttp
+import logging
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
@@ -15,9 +17,128 @@ from aiogram.fsm.storage.memory import MemoryStorage
 load_dotenv()
 # Замените на ваш токен бота
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+CLICKUP_API_TOKEN = os.getenv("CLICKUP_API_TOKEN")
+CLICKUP_WORKSPACE_ID = os.getenv("CLICKUP_WORKSPACE_ID")
 
 # Файл для хранения данных
 DATA_FILE = "salary_data.json"
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+async def retry_with_backoff(func, max_retries=3, backoff_factor=1):
+    """Retry decorator with exponential backoff"""
+    for attempt in range(max_retries):
+        try:
+            return await func()
+        except aiohttp.ClientError as e:
+            if attempt == max_retries - 1:
+                raise e
+            wait_time = backoff_factor * (2 ** attempt)
+            logger.warning(f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
+            await asyncio.sleep(wait_time)
+        except Exception as e:
+            # Для других ошибок не повторяем
+            raise e
+
+
+class ClickUpClient:
+    """Клиент для работы с ClickUp API"""
+    
+    def __init__(self, api_token: str, workspace_id: str):
+        self.api_token = api_token
+        self.workspace_id = workspace_id
+        self.base_url = "https://api.clickup.com/api/v2"
+        self.team_id = None
+        
+    def _get_headers(self) -> Dict[str, str]:
+        """Получение заголовков для API запросов"""
+        return {
+            "Authorization": self.api_token,
+            "Content-Type": "application/json"
+        }
+    
+    async def get_team_id(self) -> Optional[str]:
+        """Получение team_id из workspace_id"""
+        if self.team_id:
+            return self.team_id
+        
+        async def _fetch_team_id():
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                url = f"{self.base_url}/team"
+                async with session.get(url, headers=self._get_headers()) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        teams = data.get('teams', [])
+                        for team in teams:
+                            if team.get('id') == self.workspace_id:
+                                self.team_id = self.workspace_id
+                                return self.team_id
+                        # Если не найден точно, берем первый доступный
+                        if teams:
+                            self.team_id = teams[0]['id']
+                            return self.team_id
+                    elif response.status == 401:
+                        raise ValueError("Неверный API токен ClickUp")
+                    elif response.status == 403:
+                        raise ValueError("Нет доступа к API ClickUp")
+                    else:
+                        raise aiohttp.ClientError(f"HTTP {response.status}")
+                    return None
+        
+        try:
+            result = await retry_with_backoff(_fetch_team_id)
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка получения team_id: {e}")
+            return None
+    
+    async def get_time_entries(self, start_date: datetime, end_date: datetime) -> List[Dict]:
+        """Получение записей времени за указанный период"""
+        team_id = await self.get_team_id()
+        if not team_id:
+            return []
+        
+        async def _fetch_time_entries():
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+                url = f"{self.base_url}/team/{team_id}/time_entries"
+                params = {
+                    'start_date': int(start_date.timestamp() * 1000),
+                    'end_date': int(end_date.timestamp() * 1000)
+                }
+                
+                async with session.get(url, headers=self._get_headers(), params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data.get('data', [])
+                    elif response.status == 401:
+                        raise ValueError("Неверный API токен ClickUp")
+                    elif response.status == 403:
+                        raise ValueError("Нет доступа к записям времени")
+                    elif response.status == 429:
+                        raise aiohttp.ClientError("Превышен лимит запросов API")
+                    else:
+                        raise aiohttp.ClientError(f"HTTP {response.status}")
+        
+        try:
+            return await retry_with_backoff(_fetch_time_entries)
+        except Exception as e:
+            logger.error(f"Ошибка получения записей времени: {e}")
+            return []
+    
+    async def get_current_timer(self) -> Optional[Dict]:
+        """Получение текущего запущенного таймера (запись с отрицательной продолжительностью)"""
+        # Получаем записи за последние 24 часа
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=1)
+        
+        entries = await self.get_time_entries(start_date, end_date)
+        for entry in entries:
+            if int(entry.get('duration', 0)) < 0:
+                return entry
+        return None
 
 
 class SalaryStates(StatesGroup):
@@ -30,6 +151,12 @@ class SalaryBot:
         self.bot = Bot(token=token)
         self.dp = Dispatcher(storage=MemoryStorage())
         self.data = self.load_data()
+        
+        # Инициализация ClickUp клиента
+        self.clickup_client = None
+        if CLICKUP_API_TOKEN and CLICKUP_WORKSPACE_ID:
+            self.clickup_client = ClickUpClient(CLICKUP_API_TOKEN, CLICKUP_WORKSPACE_ID)
+        
         self.setup_handlers()
 
     def load_data(self) -> Dict[str, Any]:
@@ -37,23 +164,41 @@ class SalaryBot:
         if os.path.exists(DATA_FILE):
             try:
                 with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    # Конвертируем lists обратно в sets
+                    for user_id, user_data in data.items():
+                        if "clickup_synced_entries" in user_data and isinstance(user_data["clickup_synced_entries"], list):
+                            user_data["clickup_synced_entries"] = set(user_data["clickup_synced_entries"])
+                    return data
             except:
                 return {}
         return {}
 
     def save_data(self):
         """Сохранение данных в файл"""
+        # Конвертируем sets в lists для JSON сериализации
+        data_to_save = {}
+        for user_id, user_data in self.data.items():
+            data_to_save[user_id] = user_data.copy()
+            if "clickup_synced_entries" in data_to_save[user_id]:
+                data_to_save[user_id]["clickup_synced_entries"] = list(data_to_save[user_id]["clickup_synced_entries"])
+        
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, ensure_ascii=False, indent=2)
+            json.dump(data_to_save, f, ensure_ascii=False, indent=2)
 
     def get_user_data(self, user_id: str) -> Dict[str, Any]:
         """Получение данных пользователя"""
         if user_id not in self.data:
             self.data[user_id] = {
                 "rate": 0,
-                "work_sessions": {}
+                "work_sessions": {},
+                "clickup_synced_entries": set()  # Для отслеживания уже синхронизированных записей
             }
+        
+        # Обновление структуры для старых пользователей
+        if "clickup_synced_entries" not in self.data[user_id]:
+            self.data[user_id]["clickup_synced_entries"] = set()
+            
         return self.data[user_id]
 
     def format_hours_minutes(self, total_hours: float) -> str:
@@ -79,6 +224,87 @@ class SalaryBot:
         year = date.strftime('%Y')
         return f"{russian_month} {year}"
 
+    async def sync_clickup_entries(self, user_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+        """Синхронизация записей ClickUp с данными пользователя"""
+        if not self.clickup_client:
+            return {"success": False, "error": "ClickUp не настроен"}
+        
+        user_data = self.get_user_data(user_id)
+        
+        try:
+            # Получаем записи из ClickUp
+            clickup_entries = await self.clickup_client.get_time_entries(start_date, end_date)
+            
+            if not clickup_entries:
+                return {"success": True, "synced_count": 0, "message": "Записи не найдены"}
+            
+            synced_count = 0
+            total_hours = 0
+            total_earnings = 0
+            
+            for entry in clickup_entries:
+                entry_id = entry.get('id')
+                duration_ms = int(entry.get('duration', 0))
+                
+                # Пропускаем запущенные таймеры (отрицательная продолжительность) 
+                if duration_ms < 0:
+                    continue
+                
+                # Проверяям, не была ли уже синхронизирована эта запись
+                if entry_id in user_data["clickup_synced_entries"]:
+                    continue
+                
+                # Конвертируем миллисекунды в часы
+                duration_hours = duration_ms / (1000 * 60 * 60)
+                earnings = duration_hours * user_data["rate"]
+                
+                # Получаем дату записи
+                start_timestamp = int(entry.get('start', 0)) / 1000
+                entry_date = datetime.fromtimestamp(start_timestamp).strftime("%Y-%m-%d")
+                
+                # Создаем или обновляем сессию для этой даты
+                if entry_date not in user_data["work_sessions"]:
+                    user_data["work_sessions"][entry_date] = {
+                        "total_hours": 0,
+                        "total_earnings": 0,
+                        "sessions": []
+                    }
+                
+                # Добавляем ClickUp запись
+                clickup_session = {
+                    "hours": int(duration_hours),
+                    "minutes": int((duration_hours % 1) * 60),
+                    "earnings": earnings,
+                    "timestamp": datetime.fromtimestamp(start_timestamp).isoformat(),
+                    "source": "clickup",
+                    "clickup_id": entry_id,
+                    "task_name": entry.get('task', {}).get('name', 'Неизвестная задача') if entry.get('task') else 'Без задачи',
+                    "description": entry.get('description', '')
+                }
+                
+                user_data["work_sessions"][entry_date]["sessions"].append(clickup_session)
+                user_data["work_sessions"][entry_date]["total_hours"] += duration_hours
+                user_data["work_sessions"][entry_date]["total_earnings"] += earnings
+                
+                # Отмечаем запись как синхронизированную
+                user_data["clickup_synced_entries"].add(entry_id)
+                
+                synced_count += 1
+                total_hours += duration_hours
+                total_earnings += earnings
+            
+            self.save_data()
+            
+            return {
+                "success": True,
+                "synced_count": synced_count,
+                "total_hours": total_hours,
+                "total_earnings": total_earnings
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def setup_handlers(self):
         """Настройка обработчиков команд"""
 
@@ -90,7 +316,7 @@ class SalaryBot:
             welcome_text = (
                 "🎯 Добро пожаловать в бота для подсчета зарплаты!\n\n"
                 "Этот бот поможет вам отслеживать рабочее время и рассчитывать заработок.\n\n"
-                "📋 Доступные команды:\n"
+                "📋 Основные команды:\n"
                 "/setrate - установить ставку (руб/час)\n"
                 "/addtime - добавить отработанное время\n"
                 "/today - заработок за сегодня\n"
@@ -99,9 +325,18 @@ class SalaryBot:
                 "/weekdetails - детальный заработок по дням недели\n"
                 "/month - заработок за месяц\n"
                 "/monthweeks - заработок по неделям в месяце\n"
-                "/year - заработок по месяцам в году\n"
-                "/help - показать эту справку\n\n"
+                "/year - заработок по месяцам в году\n\n"
             )
+            
+            if self.clickup_client:
+                welcome_text += (
+                    "🔗 ClickUp интеграция:\n"
+                    "/syncclickup - синхронизировать данные ClickUp за сегодня\n"
+                    "/synclast - синхронизировать за последние N дней\n"
+                    "/clickupstatus - статус интеграции ClickUp\n\n"
+                )
+            
+            welcome_text += "/help - показать полную справку\n\n"
 
             if user_data["rate"] > 0:
                 welcome_text += f"💰 Ваша текущая ставка: {user_data['rate']} руб/час"
@@ -114,6 +349,7 @@ class SalaryBot:
         async def help_command(message: Message):
             help_text = (
                 "📋 Справка по командам:\n\n"
+                "🏠 Основные команды:\n"
                 "/start - главное меню\n"
                 "/setrate - установить ставку (руб/час)\n"
                 "/addtime - добавить отработанное время\n"
@@ -124,8 +360,20 @@ class SalaryBot:
                 "/month - заработок за месяц\n"
                 "/monthweeks - заработок по неделям в месяце\n"
                 "/year - заработок по месяцам в году\n\n"
+            )
+            
+            if self.clickup_client:
+                help_text += (
+                    "🔗 ClickUp интеграция:\n"
+                    "/syncclickup - синхронизировать данные ClickUp за сегодня\n"
+                    "/synclast [дни] - синхронизировать за последние N дней (по умолчанию 7)\n"
+                    "/clickupstatus - статус интеграции и активные таймеры\n\n"
+                )
+            
+            help_text += (
                 "💡 Для добавления времени используйте формат: ЧАСЫ МИНУТЫ\n"
-                "Например: 8 30 (означает 8 часов 30 минут)"
+                "Например: 8 30 (означает 8 часов 30 минут)\n\n"
+                "🔄 ClickUp синхронизация автоматически объединяет данные из ClickUp с вашими ручными записями."
             )
             await message.answer(help_text)
 
@@ -202,7 +450,8 @@ class SalaryBot:
                     "hours": hours,
                     "minutes": minutes,
                     "earnings": earnings,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "manual"
                 })
 
                 self.save_data()
@@ -220,6 +469,129 @@ class SalaryBot:
 
             except ValueError:
                 await message.answer("❌ Пожалуйста, введите корректные числа!")
+
+        @self.dp.message(Command("syncclickup"))
+        async def sync_clickup_command(message: Message):
+            if not self.clickup_client:
+                await message.answer("❌ ClickUp интеграция не настроена")
+                return
+                
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if user_data["rate"] <= 0:
+                await message.answer("❌ Сначала установите ставку командой /setrate")
+                return
+                
+            await message.answer("🔄 Синхронизирую данные ClickUp за сегодня...")
+            
+            # Синхронизация за сегодня
+            today = datetime.now()
+            start_of_today = today.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            result = await self.sync_clickup_entries(user_id, start_of_today, today)
+            
+            if result["success"]:
+                if result["synced_count"] > 0:
+                    response = (
+                        f"✅ Синхронизация завершена!\n\n"
+                        f"📥 Синхронизировано записей: {result['synced_count']}\n"
+                        f"⏰ Всего времени: {self.format_hours_minutes(result['total_hours'])}\n"
+                        f"💰 Заработано: {result['total_earnings']:.2f} руб"
+                    )
+                else:
+                    response = result.get("message", "✅ Новых записей для синхронизации не найдено")
+            else:
+                response = f"❌ Ошибка синхронизации: {result['error']}"
+                
+            await message.answer(response)
+
+        @self.dp.message(Command("synclast"))
+        async def sync_last_command(message: Message):
+            if not self.clickup_client:
+                await message.answer("❌ ClickUp интеграция не настроена")
+                return
+                
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if user_data["rate"] <= 0:
+                await message.answer("❌ Сначала установите ставку командой /setrate")
+                return
+            
+            # Получаем количество дней из команды (по умолчанию 7)
+            command_parts = message.text.strip().split()
+            days = 7
+            if len(command_parts) > 1:
+                try:
+                    days = int(command_parts[1])
+                    if days <= 0 or days > 30:
+                        await message.answer("❌ Количество дней должно быть от 1 до 30")
+                        return
+                except ValueError:
+                    await message.answer("❌ Введите корректное количество дней")
+                    return
+            
+            await message.answer(f"🔄 Синхронизирую данные ClickUp за последние {days} дней...")
+            
+            # Синхронизация за последние N дней
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+            
+            result = await self.sync_clickup_entries(user_id, start_date, end_date)
+            
+            if result["success"]:
+                if result["synced_count"] > 0:
+                    response = (
+                        f"✅ Синхронизация завершена!\n\n"
+                        f"📅 Период: {days} дней\n"
+                        f"📥 Синхронизировано записей: {result['synced_count']}\n"
+                        f"⏰ Всего времени: {self.format_hours_minutes(result['total_hours'])}\n"
+                        f"💰 Заработано: {result['total_earnings']:.2f} руб"
+                    )
+                else:
+                    response = result.get("message", "✅ Новых записей для синхронизации не найдено")
+            else:
+                response = f"❌ Ошибка синхронизации: {result['error']}"
+                
+            await message.answer(response)
+
+        @self.dp.message(Command("clickupstatus"))
+        async def clickup_status_command(message: Message):
+            if not self.clickup_client:
+                await message.answer("❌ ClickUp интеграция не настроена\n\nДля настройки добавьте в .env файл:\nCLICKUP_API_TOKEN=ваш_токен\nCLICKUP_WORKSPACE_ID=id_рабочего_пространства")
+                return
+            
+            await message.answer("🔍 Проверяю статус ClickUp...")
+            
+            # Проверяем подключение
+            team_id = await self.clickup_client.get_team_id()
+            if not team_id:
+                await message.answer("❌ Не удалось подключиться к ClickUp. Проверьте настройки API.")
+                return
+            
+            # Проверяем активные таймеры
+            current_timer = await self.clickup_client.get_current_timer()
+            
+            response = "✅ ClickUp интеграция активна\n\n"
+            response += f"🏢 Team ID: {team_id}\n"
+            
+            if current_timer:
+                task_name = "Неизвестная задача"
+                if current_timer.get('task'):
+                    task_name = current_timer['task'].get('name', task_name)
+                
+                start_time = datetime.fromtimestamp(int(current_timer.get('start', 0)) / 1000)
+                response += f"\n⏳ Активный таймер:\n📋 Задача: {task_name}\n🕐 Запущен: {start_time.strftime('%H:%M %d.%m.%Y')}"
+            else:
+                response += "\n⏹ Активных таймеров нет"
+            
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+            synced_count = len(user_data.get("clickup_synced_entries", set()))
+            response += f"\n\n📊 Синхронизировано записей: {synced_count}"
+            
+            await message.answer(response)
 
         @self.dp.message(Command("today"))
         async def today_command(message: Message):
