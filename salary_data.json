@@ -10,191 +10,2342 @@
             "hours": 1,
             "minutes": 33,
             "earnings": 465.0,
-            "timestamp": "2025-07-03T12:00:00.000000"
+            "timestamp": "2025-07-03T18:17:00",
+            "source": "clickup",
+            "clickup_id": "4626480455192744693",
+            "task_name": "Создание композеров для продуктов",
+            "description": ""
           }
         ]
       },
       "2025-07-04": {
-        "total_hours": 2.95,
-        "total_earnings": 885.0,
+        "total_hours": 2.953715,
+        "total_earnings": 886.1145,
         "sessions": [
           {
-            "hours": 2,
-            "minutes": 57,
-            "earnings": 885.0,
-            "timestamp": "2025-07-04T12:00:00.000000"
+            "hours": 1,
+            "minutes": 42,
+            "earnings": 511.4144166666667,
+            "timestamp": "2025-07-04T17:01:00.839000",
+            "source": "clickup",
+            "clickup_id": "4627852761886426824",
+            "task_name": "Поднять проект",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 14,
+            "earnings": 374.70008333333334,
+            "timestamp": "2025-07-04T18:44:06.702000",
+            "source": "clickup",
+            "clickup_id": "4627956543395796439",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
           }
         ]
       },
       "2025-07-08": {
-        "total_hours": 1.1166666666666667,
-        "total_earnings": 335.0,
+        "total_hours": 1.126725,
+        "total_earnings": 338.0175,
         "sessions": [
           {
             "hours": 1,
             "minutes": 7,
-            "earnings": 335.0,
-            "timestamp": "2025-07-08T12:00:00.000000"
+            "earnings": 338.0175,
+            "timestamp": "2025-07-08T11:07:27.012000",
+            "source": "clickup",
+            "clickup_id": "4633295089128259080",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
           }
         ]
       },
       "2025-07-09": {
-        "total_hours": 1.0,
-        "total_earnings": 300.0,
+        "total_hours": 1.01041,
+        "total_earnings": 303.12300000000005,
         "sessions": [
           {
-            "hours": 1,
-            "minutes": 0,
-            "earnings": 300.0,
-            "timestamp": "2025-07-09T12:00:00.000000"
+            "hours": 0,
+            "minutes": 27,
+            "earnings": 135.48083333333335,
+            "timestamp": "2025-07-09T14:30:15.601000",
+            "source": "clickup",
+            "clickup_id": "4634948795603169852",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 15,
+            "earnings": 76.4135,
+            "timestamp": "2025-07-09T15:43:22.118000",
+            "source": "clickup",
+            "clickup_id": "4635022387720306461",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 18,
+            "earnings": 91.22866666666667,
+            "timestamp": "2025-07-09T16:02:21.181000",
+            "source": "clickup",
+            "clickup_id": "4635041497187418774",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
           }
         ]
       },
       "2025-07-14": {
-        "total_hours": 0.16666666666666666,
-        "total_earnings": 50.0,
+        "total_hours": 0.16784888888888888,
+        "total_earnings": 50.35466666666667,
         "sessions": [
           {
             "hours": 0,
             "minutes": 10,
-            "earnings": 50.0,
-            "timestamp": "2025-07-14T12:00:00.000000"
+            "earnings": 50.35466666666667,
+            "timestamp": "2025-07-14T14:02:55.189000",
+            "source": "clickup",
+            "clickup_id": "4642169038499035163",
+            "task_name": "Создать поле оплата и поле доставка в общие данные сайта",
+            "description": ""
           }
         ]
       },
       "2025-07-15": {
-        "total_hours": 0.15,
-        "total_earnings": 45.0,
+        "total_hours": 0.15299972222222222,
+        "total_earnings": 45.89991666666666,
         "sessions": [
           {
             "hours": 0,
             "minutes": 9,
-            "earnings": 45.0,
-            "timestamp": "2025-07-15T12:00:00.000000"
+            "earnings": 45.89991666666666,
+            "timestamp": "2025-07-15T15:35:33.607000",
+            "source": "clickup",
+            "clickup_id": "4643711838214493493",
+            "task_name": "Реализация AboutComposer",
+            "description": ""
           }
         ]
       },
       "2025-07-16": {
-        "total_hours": 0.18333333333333332,
-        "total_earnings": 55.0,
+        "total_hours": 0.18459944444444445,
+        "total_earnings": 55.37983333333334,
         "sessions": [
           {
             "hours": 0,
             "minutes": 11,
-            "earnings": 55.0,
-            "timestamp": "2025-07-16T12:00:00.000000"
+            "earnings": 55.37983333333334,
+            "timestamp": "2025-07-16T15:45:24.531000",
+            "source": "clickup",
+            "clickup_id": "4645171299760283256",
+            "task_name": "Добавить в ACF картинку под описанием чтобы было как в дизайне",
+            "description": ""
           }
         ]
       },
       "2025-07-17": {
-        "total_hours": 1.2833333333333334,
-        "total_earnings": 385.0,
+        "total_hours": 1.2924966666666666,
+        "total_earnings": 387.749,
         "sessions": [
           {
-            "hours": 1,
-            "minutes": 17,
-            "earnings": 385.0,
-            "timestamp": "2025-07-17T12:00:00.000000"
+            "hours": 0,
+            "minutes": 8,
+            "earnings": 43.24508333333333,
+            "timestamp": "2025-07-17T13:02:35.162000",
+            "source": "clickup",
+            "clickup_id": "4646456948190677438",
+            "task_name": "Добавить в ACF картинку под описанием чтобы было как в дизайне",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 41,
+            "earnings": 209.43516666666665,
+            "timestamp": "2025-07-17T13:12:17.011000",
+            "source": "clickup",
+            "clickup_id": "4646466712043850633",
+            "task_name": "Сделать бек для галереи на странице товара",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 8,
+            "earnings": 40.61816666666667,
+            "timestamp": "2025-07-17T13:54:16.165000",
+            "source": "clickup",
+            "clickup_id": "4646508977793602138",
+            "task_name": "Забрать из  ACF вопрос-ответ из товара-переместить в категорию",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 14,
+            "earnings": 74.74791666666667,
+            "timestamp": "2025-07-17T14:25:12.917000",
+            "source": "clickup",
+            "clickup_id": "4646540125835958205",
+            "task_name": "Забрать из  ACF вопрос-ответ из товара-переместить в категорию",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 3,
+            "earnings": 19.702666666666666,
+            "timestamp": "2025-07-17T17:17:46.888000",
+            "source": "clickup",
+            "clickup_id": "4646713839160473417",
+            "task_name": "Забрать из  ACF вопрос-ответ из товара-переместить в категорию",
+            "description": ""
           }
         ]
       },
       "2025-07-21": {
-        "total_hours": 6.783333333333333,
-        "total_earnings": 2035.0,
+        "total_hours": 6.791810277777778,
+        "total_earnings": 2037.5430833333335,
         "sessions": [
           {
-            "hours": 6,
-            "minutes": 47,
-            "earnings": 2035.0,
-            "timestamp": "2025-07-21T12:00:00.000000"
+            "hours": 0,
+            "minutes": 52,
+            "earnings": 260.19233333333335,
+            "timestamp": "2025-07-21T11:56:45.742000",
+            "source": "clickup",
+            "clickup_id": "4652188897593068374",
+            "task_name": "Текст над контактами положить в общие данные сайта",
+            "description": ""
+          },
+          {
+            "hours": 4,
+            "minutes": 59,
+            "earnings": 1499.876,
+            "timestamp": "2025-07-21T12:49:28.141000",
+            "source": "clickup",
+            "clickup_id": "4652241950388066136",
+            "task_name": "Добавить доп услуги",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 55,
+            "earnings": 277.47475000000003,
+            "timestamp": "2025-07-21T18:20:27.718000",
+            "source": "clickup",
+            "clickup_id": "4652575141468641189",
+            "task_name": "Добавить доп услуги",
+            "description": ""
           }
         ]
       },
       "2025-07-22": {
-        "total_hours": 6.733333333333333,
-        "total_earnings": 2020.0,
+        "total_hours": 6.745280555555555,
+        "total_earnings": 2023.5841666666668,
         "sessions": [
           {
-            "hours": 6,
-            "minutes": 44,
-            "earnings": 2020.0,
-            "timestamp": "2025-07-22T12:00:00.000000"
+            "hours": 3,
+            "minutes": 33,
+            "earnings": 1067.8113333333333,
+            "timestamp": "2025-07-22T12:16:17.753000",
+            "source": "clickup",
+            "clickup_id": "4653658108865617384",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 53,
+            "earnings": 567.6330833333334,
+            "timestamp": "2025-07-22T15:59:56.203000",
+            "source": "clickup",
+            "clickup_id": "4653883234441825242",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 17,
+            "earnings": 388.13975,
+            "timestamp": "2025-07-22T17:53:47.559000",
+            "source": "clickup",
+            "clickup_id": "4653997847892271733",
+            "task_name": "Пофиксить баг в категории автовесы",
+            "description": ""
           }
         ]
       },
       "2025-07-23": {
-        "total_hours": 5.3,
-        "total_earnings": 1590.0,
+        "total_hours": 5.301841944444444,
+        "total_earnings": 1590.5525833333334,
         "sessions": [
           {
-            "hours": 5,
-            "minutes": 18,
-            "earnings": 1590.0,
-            "timestamp": "2025-07-23T12:00:00.000000"
+            "hours": 2,
+            "minutes": 7,
+            "earnings": 639.92625,
+            "timestamp": "2025-07-23T11:42:27.400000",
+            "source": "clickup",
+            "clickup_id": "4655073595717657268",
+            "task_name": "Комплектацию в админке сделать выпадающим списком",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 13,
+            "earnings": 369.86025,
+            "timestamp": "2025-07-23T14:04:03.239000",
+            "source": "clickup",
+            "clickup_id": "4655216134458261050",
+            "task_name": "Пофиксить баг в категории автовесы",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 49,
+            "earnings": 247.97491666666667,
+            "timestamp": "2025-07-23T15:27:47.422000",
+            "source": "clickup",
+            "clickup_id": "4655300424953040314",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 6,
+            "earnings": 332.79116666666664,
+            "timestamp": "2025-07-23T16:57:41.911000",
+            "source": "clickup",
+            "clickup_id": "4655390933302189563",
+            "task_name": "Доставки и оплата скрыть из товара",
+            "description": ""
           }
         ]
       },
       "2025-07-24": {
-        "total_hours": 5.1,
-        "total_earnings": 1530.0,
+        "total_hours": 5.103272777777778,
+        "total_earnings": 1530.9818333333333,
         "sessions": [
           {
-            "hours": 5,
-            "minutes": 6,
-            "earnings": 1530.0,
-            "timestamp": "2025-07-24T12:00:00.000000"
+            "hours": 1,
+            "minutes": 10,
+            "earnings": 353.8111666666667,
+            "timestamp": "2025-07-24T11:35:54.076000",
+            "source": "clickup",
+            "clickup_id": "4656516548969440942",
+            "task_name": "Вывод контактной информации",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 17,
+            "earnings": 89.73516666666666,
+            "timestamp": "2025-07-24T13:00:58.934000",
+            "source": "clickup",
+            "clickup_id": "4656602193435899473",
+            "task_name": "ACF + Composer для главной страницы и сингл курса",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 37,
+            "earnings": 488.9071666666667,
+            "timestamp": "2025-07-24T13:19:31.167000",
+            "source": "clickup",
+            "clickup_id": "4656620854565484943",
+            "task_name": "Написать свод правил для Claude Code",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 13,
+            "earnings": 66.5135,
+            "timestamp": "2025-07-24T15:52:54.016000",
+            "source": "clickup",
+            "clickup_id": "4656775253623378717",
+            "task_name": "Написать свод правил для Claude Code",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 21,
+            "earnings": 107.91041666666666,
+            "timestamp": "2025-07-24T16:06:18.841000",
+            "source": "clickup",
+            "clickup_id": "4656788755943593422",
+            "task_name": "product crud c file  и  с  его связями  productCategory brand  productGroups",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 24,
+            "earnings": 424.1044166666666,
+            "timestamp": "2025-07-24T16:32:44.739000",
+            "source": "clickup",
+            "clickup_id": "4656815361454054297",
+            "task_name": "product crud c file  и  с  его связями  productCategory brand  productGroups",
+            "description": ""
           }
         ]
       },
       "2025-07-25": {
-        "total_hours": 5.966666666666667,
-        "total_earnings": 1790.0,
+        "total_hours": 5.967845555555556,
+        "total_earnings": 1790.3536666666669,
         "sessions": [
           {
-            "hours": 5,
-            "minutes": 58,
-            "earnings": 1790.0,
-            "timestamp": "2025-07-25T12:00:00.000000"
+            "hours": 1,
+            "minutes": 5,
+            "earnings": 328.14750000000004,
+            "timestamp": "2025-07-25T12:39:36.212000",
+            "source": "clickup",
+            "clickup_id": "4658030234712223719",
+            "task_name": "Пофиксить баг в категории автовесы",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 11,
+            "earnings": 357.1586666666667,
+            "timestamp": "2025-07-25T13:48:25.001000",
+            "source": "clickup",
+            "clickup_id": "4658099495036074785",
+            "task_name": "Фикс долгой загрузки страницы с товарами",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 11,
+            "earnings": 356.969,
+            "timestamp": "2025-07-25T15:00:22.031000",
+            "source": "clickup",
+            "clickup_id": "4658171936957597271",
+            "task_name": "Исправить вывод изображения в переменной $product_categories на странице product_category",
+            "description": ""
+          },
+          {
+            "hours": 2,
+            "minutes": 29,
+            "earnings": 748.0785,
+            "timestamp": "2025-07-25T16:12:04.575000",
+            "source": "clickup",
+            "clickup_id": "4658244122254840508",
+            "task_name": "Разделить категорию товара автовесы ПВТ на ПВТ-А и ПВТ-Б",
+            "description": ""
           }
         ]
       },
       "2025-07-26": {
-        "total_hours": 2.55,
-        "total_earnings": 765.0,
+        "total_hours": 2.5646980555555556,
+        "total_earnings": 769.4094166666667,
         "sessions": [
           {
-            "hours": 2,
-            "minutes": 33,
-            "earnings": 765.0,
-
-            "timestamp": "2025-07-26T12:00:00.000000"
+            "hours": 0,
+            "minutes": 26,
+            "earnings": 132.03408333333334,
+            "timestamp": "2025-07-26T12:52:46.816000",
+            "source": "clickup",
+            "clickup_id": "4659493050140918326",
+            "task_name": "Разделить категорию товара автовесы ПВТ на ПВТ-А и ПВТ-Б",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 13,
+            "earnings": 366.4219166666667,
+            "timestamp": "2025-07-26T13:19:59.009000",
+            "source": "clickup",
+            "clickup_id": "4659520433912873631",
+            "task_name": "Реализовать меню услуги",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 43,
+            "earnings": 217.28641666666667,
+            "timestamp": "2025-07-26T16:11:19.169000",
+            "source": "clickup",
+            "clickup_id": "4659692899230614740",
+            "task_name": "Реализовать меню услуги",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 10,
+            "earnings": 53.667,
+            "timestamp": "2025-07-26T17:04:28.436000",
+            "source": "clickup",
+            "clickup_id": "4659746406251955566",
+            "task_name": "Реализовать меню услуги",
+            "description": ""
           }
         ]
       },
       "2025-07-28": {
-        "total_hours": 7.633333333333334,
-        "total_earnings": 2290.0,
+        "total_hours": 7.6397175,
+        "total_earnings": 2291.9152499999996,
         "sessions": [
           {
-            "hours": 7,
-            "minutes": 38,
-            "earnings": 2290.0,
-            "timestamp": "2025-07-28T12:00:00.000000"
+            "hours": 0,
+            "minutes": 53,
+            "earnings": 269.89258333333333,
+            "timestamp": "2025-07-28T10:37:18.547000",
+            "source": "clickup",
+            "clickup_id": "4662255706753022780",
+            "task_name": "Вывести доп.оснащение на страницу товара",
+            "description": ""
+          },
+          {
+            "hours": 4,
+            "minutes": 10,
+            "earnings": 1253.0294166666665,
+            "timestamp": "2025-07-28T11:32:00.963000",
+            "source": "clickup",
+            "clickup_id": "4662310846012918360",
+            "task_name": "Рефакторинг возвращаемых типов данных и проверок",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 53,
+            "earnings": 568.99125,
+            "timestamp": "2025-07-28T15:42:41.285000",
+            "source": "clickup",
+            "clickup_id": "4662563182555774900",
+            "task_name": "Поменять почту на велтекс",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 40,
+            "earnings": 200.002,
+            "timestamp": "2025-07-28T17:36:48.615000",
+            "source": "clickup",
+            "clickup_id": "4662678060650010344",
+            "task_name": "Рефакторинг возвращаемых типов данных и проверок",
+            "description": ""
           }
         ]
       },
       "2025-07-29": {
-        "total_hours": 4.533333333333333,
-        "total_earnings": 1360.0,
+        "total_hours": 4.535044166666666,
+        "total_earnings": 1360.51325,
         "sessions": [
           {
-            "hours": 4,
+            "hours": 0,
+            "minutes": 19,
+            "earnings": 99.99091666666666,
+            "timestamp": "2025-07-29T12:34:44.147000",
+            "source": "clickup",
+            "clickup_id": "4663823536514476362",
+            "task_name": "Фикс вывода характеристик на карточках товаров",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 24,
+            "earnings": 124.40516666666667,
+            "timestamp": "2025-07-29T12:58:25.680000",
+            "source": "clickup",
+            "clickup_id": "4663847382290345383",
+            "task_name": "Заполнение главной страницы",
+            "description": ""
+          },
+          {
+            "hours": 0,
             "minutes": 32,
-            "earnings": 1360.0,
-            "timestamp": "2025-07-29T21:05:38.204244"
+            "earnings": 162.11658333333335,
+            "timestamp": "2025-07-29T13:23:38.608000",
+            "source": "clickup",
+            "clickup_id": "4663872766402703947",
+            "task_name": "Фикс вывода характеристик на карточках товаров",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 59,
+            "earnings": 296.2635833333333,
+            "timestamp": "2025-07-29T13:56:26.420000",
+            "source": "clickup",
+            "clickup_id": "4663905784215451815",
+            "task_name": "Заполнение главной страницы",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 29,
+            "earnings": 147.09341666666666,
+            "timestamp": "2025-07-29T14:55:50.331000",
+            "source": "clickup",
+            "clickup_id": "4663965587625280144",
+            "task_name": "Добавить иконки в админку в галерею партнеров",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 31,
+            "earnings": 155.13083333333333,
+            "timestamp": "2025-07-29T15:54:00.275000",
+            "source": "clickup",
+            "clickup_id": "4664024124908969242",
+            "task_name": "Реализовать форму обратной связи",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 11,
+            "earnings": 59.691,
+            "timestamp": "2025-07-29T16:30:19.610000",
+            "source": "clickup",
+            "clickup_id": "4664060689794278717",
+            "task_name": "Реализовать форму обратной связи",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 3,
+            "earnings": 315.82174999999995,
+            "timestamp": "2025-07-29T16:42:31.775000",
+            "source": "clickup",
+            "clickup_id": "4664072996754630591",
+            "task_name": "Заполнение главной страницы",
+            "description": ""
           }
         ]
       }
+    },
+    "clickup_synced_entries": [
+      "4653883234441825242",
+      "4663847382290345383",
+      "4658244122254840508",
+      "4664024124908969242",
+      "4655216134458261050",
+      "4659746406251955566",
+      "4663905784215451815",
+      "4658030234712223719",
+      "4627956543395796439",
+      "4635041497187418774",
+      "4642169038499035163",
+      "4646508977793602138",
+      "4655300424953040314",
+      "4656775253623378717",
+      "4662563182555774900",
+      "4662678060650010344",
+      "4646466712043850633",
+      "4655073595717657268",
+      "4645171299760283256",
+      "4646456948190677438",
+      "4643711838214493493",
+      "4663965587625280144",
+      "4656516548969440942",
+      "4633295089128259080",
+      "4634948795603169852",
+      "4656788755943593422",
+      "4646540125835958205",
+      "4652188897593068374",
+      "4626480455192744693",
+      "4656815361454054297",
+      "4656602193435899473",
+      "4652241950388066136",
+      "4663872766402703947",
+      "4659493050140918326",
+      "4659520433912873631",
+      "4655390933302189563",
+      "4659692899230614740",
+      "4663823536514476362",
+      "4662310846012918360",
+      "4662255706753022780",
+      "4658099495036074785",
+      "4653997847892271733",
+      "4664060689794278717",
+      "4646713839160473417",
+      "4653658108865617384",
+      "4627852761886426824",
+      "4652575141468641189",
+      "4635022387720306461",
+      "4658171936957597271",
+      "4656620854565484943",
+      "4664072996754630591"
+    ],
+    "clickup_settings": {
+      "api_token": "pk_94527633_0HV1Z6SO0S5AVUT3JBX8ECC1IW0Z9K9V",
+      "workspace_id": "9015893221",
+      "team_id": "9015893221"
+    }
+  },
+  "821819937": {
+    "rate": 300.0,
+    "work_sessions": {
+      "2025-07-30": {
+        "total_hours": 0.7542597222222223,
+        "total_earnings": 226.27791666666667,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 13,
+            "earnings": 65.95025,
+            "timestamp": "2025-07-30T11:32:59.931000",
+            "source": "clickup",
+            "clickup_id": "4665210976340881792",
+            "task_name": "Рефакторинг страницы О заводе",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 32,
+            "earnings": 160.3276666666667,
+            "timestamp": "2025-07-30T11:54:25.445000",
+            "source": "clickup",
+            "clickup_id": "4665232518588216787",
+            "task_name": "Рефакторинг страницы О заводе",
+            "description": ""
+          }
+        ]
+      },
+      "2025-06-30": {
+        "total_hours": 1.275231111111111,
+        "total_earnings": 382.5693333333333,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 10,
+            "earnings": 50.090666666666664,
+            "timestamp": "2025-06-30T14:15:42.192000",
+            "source": "clickup",
+            "clickup_id": "4621888197709604919",
+            "task_name": "Рефактор страницы Главная",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 5,
+            "earnings": 329.27475,
+            "timestamp": "2025-06-30T14:40:38.876000",
+            "source": "clickup",
+            "clickup_id": "4621913294780575000",
+            "task_name": "Рефактор страницы Главная",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 0,
+            "earnings": 3.2039166666666667,
+            "timestamp": "2025-06-30T16:35:41.882000",
+            "source": "clickup",
+            "clickup_id": "4622029207022407227",
+            "task_name": "Рефактор страницы Главная",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-01": {
+        "total_hours": 0.6715747222222223,
+        "total_earnings": 201.47241666666667,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 0,
+            "earnings": 3.930833333333333,
+            "timestamp": "2025-07-01T16:01:23.766000",
+            "source": "clickup",
+            "clickup_id": "4623444145209153722",
+            "task_name": "Рефактор страницы Главная",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 27,
+            "earnings": 137.78741666666667,
+            "timestamp": "2025-07-01T18:01:06.783000",
+            "source": "clickup",
+            "clickup_id": "4623564643184227700",
+            "task_name": "Рефактор страницы Главная",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 11,
+            "earnings": 59.75416666666667,
+            "timestamp": "2025-07-01T18:46:20.490000",
+            "source": "clickup",
+            "clickup_id": "4623610165324496573",
+            "task_name": "Рефактор страницы Главная",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-02": {
+        "total_hours": 3.3152838888888887,
+        "total_earnings": 994.5851666666666,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 59,
+            "earnings": 299.6455,
+            "timestamp": "2025-07-02T12:05:00.253000",
+            "source": "clickup",
+            "clickup_id": "4624655730300756370",
+            "task_name": "Верстка каталога Продукция",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 5,
+            "earnings": 326.16658333333334,
+            "timestamp": "2025-07-02T14:44:46.132000",
+            "source": "clickup",
+            "clickup_id": "4624816542785013830",
+            "task_name": "Миграция sage",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 29,
+            "earnings": 146.69183333333334,
+            "timestamp": "2025-07-02T16:35:42.284000",
+            "source": "clickup",
+            "clickup_id": "4624928209317470588",
+            "task_name": "Миграция sage",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 44,
+            "earnings": 222.08124999999998,
+            "timestamp": "2025-07-02T17:07:50.918000",
+            "source": "clickup",
+            "clickup_id": "4624960567668189864",
+            "task_name": "Миграция sage",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-03": {
+        "total_hours": 3.1777275,
+        "total_earnings": 953.3182499999999,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 20,
+            "earnings": 104.51783333333333,
+            "timestamp": "2025-07-03T13:25:50.930000",
+            "source": "clickup",
+            "clickup_id": "4626186652233833743",
+            "task_name": "Верстка каталога Продукция",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 34,
+            "earnings": 170.76158333333333,
+            "timestamp": "2025-07-03T13:55:07.436000",
+            "source": "clickup",
+            "clickup_id": "4626216120507769560",
+            "task_name": "Верстка каталога Продукция",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 10,
+            "earnings": 351.91416666666663,
+            "timestamp": "2025-07-03T15:56:22.354000",
+            "source": "clickup",
+            "clickup_id": "4626338207788513377",
+            "task_name": "Верстка single Продукции",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 46,
+            "earnings": 230.81083333333333,
+            "timestamp": "2025-07-03T17:15:11.291000",
+            "source": "clickup",
+            "clickup_id": "4626417511071287234",
+            "task_name": "Верстка single Продукции",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 19,
+            "earnings": 95.31383333333333,
+            "timestamp": "2025-07-03T18:23:18.069000",
+            "source": "clickup",
+            "clickup_id": "4626486088931546090",
+            "task_name": "Верстка single Продукции",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-04": {
+        "total_hours": 2.6106069444444446,
+        "total_earnings": 783.1820833333334,
+        "sessions": [
+          {
+            "hours": 2,
+            "minutes": 36,
+            "earnings": 783.1820833333334,
+            "timestamp": "2025-07-04T13:04:44.578000",
+            "source": "clickup",
+            "clickup_id": "4627614956795010121",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-08": {
+        "total_hours": 3.6766708333333336,
+        "total_earnings": 1103.00125,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 39,
+            "earnings": 195.29491666666667,
+            "timestamp": "2025-07-08T12:25:36.633000",
+            "source": "clickup",
+            "clickup_id": "4633373789521776475",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 22,
+            "earnings": 411.00958333333335,
+            "timestamp": "2025-07-08T14:28:59.616000",
+            "source": "clickup",
+            "clickup_id": "4633497995664238470",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 39,
+            "earnings": 496.69675,
+            "timestamp": "2025-07-08T18:25:50.462000",
+            "source": "clickup",
+            "clickup_id": "4633736397286347940",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-09": {
+        "total_hours": 4.042821388888889,
+        "total_earnings": 1212.8464166666668,
+        "sessions": [
+          {
+            "hours": 2,
+            "minutes": 45,
+            "earnings": 829.1990000000001,
+            "timestamp": "2025-07-09T12:19:49.218000",
+            "source": "clickup",
+            "clickup_id": "4634817605927770604",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 16,
+            "earnings": 383.6474166666667,
+            "timestamp": "2025-07-09T15:16:55.061000",
+            "source": "clickup",
+            "clickup_id": "4634995792091626082",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-10": {
+        "total_hours": 4.201903611111111,
+        "total_earnings": 1260.5710833333333,
+        "sessions": [
+          {
+            "hours": 3,
+            "minutes": 6,
+            "earnings": 933.3744999999999,
+            "timestamp": "2025-07-10T12:54:42.238000",
+            "source": "clickup",
+            "clickup_id": "4636302186841450833",
+            "task_name": "Рефакторинг кода Продукция",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 5,
+            "earnings": 327.19658333333336,
+            "timestamp": "2025-07-10T16:02:41.244000",
+            "source": "clickup",
+            "clickup_id": "4636491420030276627",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-11": {
+        "total_hours": 4.041882222222222,
+        "total_earnings": 1212.5646666666669,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 27,
+            "earnings": 138.17025,
+            "timestamp": "2025-07-11T12:25:51.526000",
+            "source": "clickup",
+            "clickup_id": "4637722692530548081",
+            "task_name": "Рефакторинг главной страницы",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 0,
+            "earnings": 0.20666666666666667,
+            "timestamp": "2025-07-11T12:53:37.004000",
+            "source": "clickup",
+            "clickup_id": "4637750632232333793",
+            "task_name": "Рефакторинг главной страницы",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 0,
+            "earnings": 1.4558333333333333,
+            "timestamp": "2025-07-11T13:00:35.087000",
+            "source": "clickup",
+            "clickup_id": "4637757649823019801",
+            "task_name": "Создание архива Новости",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 29,
+            "earnings": 446.8849166666667,
+            "timestamp": "2025-07-11T13:01:41.601000",
+            "source": "clickup",
+            "clickup_id": "4637758762471207749",
+            "task_name": "Создание архива Новости",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 26,
+            "earnings": 134.19041666666666,
+            "timestamp": "2025-07-11T14:57:00.873000",
+            "source": "clickup",
+            "clickup_id": "4637874861124683473",
+            "task_name": "Создание архива Новости",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 42,
+            "earnings": 211.14508333333333,
+            "timestamp": "2025-07-11T15:24:26.593000",
+            "source": "clickup",
+            "clickup_id": "4637902466691435448",
+            "task_name": "Создание архива Новости",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 16,
+            "earnings": 83.45225,
+            "timestamp": "2025-07-11T16:19:46.539000",
+            "source": "clickup",
+            "clickup_id": "4637958173742666982",
+            "task_name": "Создание single Новости",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 26,
+            "earnings": 133.11458333333331,
+            "timestamp": "2025-07-11T17:15:06.127000",
+            "source": "clickup",
+            "clickup_id": "4638013869855153870",
+            "task_name": "Создание архива Новости",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 12,
+            "earnings": 63.94466666666666,
+            "timestamp": "2025-07-11T18:10:01.581000",
+            "source": "clickup",
+            "clickup_id": "4638069147074111486",
+            "task_name": "Рефакторинг главной страницы",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-13": {
+        "total_hours": 1.6824633333333334,
+        "total_earnings": 504.73900000000003,
+        "sessions": [
+          {
+            "hours": 1,
+            "minutes": 40,
+            "earnings": 504.73900000000003,
+            "timestamp": "2025-07-13T14:33:40.478000",
+            "source": "clickup",
+            "clickup_id": "4640750468615443255",
+            "task_name": "Заполнить Tabs для товара",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-14": {
+        "total_hours": 3.174002777777778,
+        "total_earnings": 952.2008333333333,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 31,
+            "earnings": 157.26508333333334,
+            "timestamp": "2025-07-14T13:02:20.890000",
+            "source": "clickup",
+            "clickup_id": "4642108093869403128",
+            "task_name": "Отрефакторить компонент галереи - уйти от product-gallery",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 26,
+            "earnings": 133.75725,
+            "timestamp": "2025-07-14T14:31:35.808000",
+            "source": "clickup",
+            "clickup_id": "4642197900830260695",
+            "task_name": "Отрефакторить product-info стили",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 5,
+            "earnings": 26.963749999999997,
+            "timestamp": "2025-07-14T15:16:46.835000",
+            "source": "clickup",
+            "clickup_id": "4642243412820297214",
+            "task_name": "Отрефакторить код Tabs",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 43,
+            "earnings": 219.15166666666664,
+            "timestamp": "2025-07-14T15:23:50.695000",
+            "source": "clickup",
+            "clickup_id": "4642250498794915651",
+            "task_name": "Вывести категории товаров в single-product и на главную страницу",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 18,
+            "earnings": 92.25933333333333,
+            "timestamp": "2025-07-14T16:12:41.111000",
+            "source": "clickup",
+            "clickup_id": "4642299660399874487",
+            "task_name": "Вывести категории товаров в single-product и на главную страницу",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 37,
+            "earnings": 185.83658333333332,
+            "timestamp": "2025-07-14T16:50:56.597000",
+            "source": "clickup",
+            "clickup_id": "4642338174277589475",
+            "task_name": "Добавить наполняемость на главную страницу",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 27,
+            "earnings": 136.96716666666666,
+            "timestamp": "2025-07-14T18:18:09.852000",
+            "source": "clickup",
+            "clickup_id": "4642425982585481771",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-15": {
+        "total_hours": 4.579354444444444,
+        "total_earnings": 1373.8063333333334,
+        "sessions": [
+          {
+            "hours": 1,
+            "minutes": 36,
+            "earnings": 482.91016666666667,
+            "timestamp": "2025-07-15T12:14:50.743000",
+            "source": "clickup",
+            "clickup_id": "4643509797970063144",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          },
+          {
+            "hours": 2,
+            "minutes": 37,
+            "earnings": 786.7062500000001,
+            "timestamp": "2025-07-15T15:00:41.567000",
+            "source": "clickup",
+            "clickup_id": "4643676742711316263",
+            "task_name": "Реализация страницы \"О заводе\"",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 7,
+            "earnings": 35.69025,
+            "timestamp": "2025-07-15T17:38:34.339000",
+            "source": "clickup",
+            "clickup_id": "4643835673563704917",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 8,
+            "earnings": 41.46966666666667,
+            "timestamp": "2025-07-15T17:45:44.509000",
+            "source": "clickup",
+            "clickup_id": "4643842888924213166",
+            "task_name": "Реализация страницы \"О заводе\"",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 5,
+            "earnings": 27.03,
+            "timestamp": "2025-07-15T18:05:59.913000",
+            "source": "clickup",
+            "clickup_id": "4643863280036426510",
+            "task_name": "Реализация страницы \"О заводе\"",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-16": {
+        "total_hours": 6.224948333333333,
+        "total_earnings": 1867.4845,
+        "sessions": [
+          {
+            "hours": 1,
+            "minutes": 42,
+            "earnings": 510.8716666666666,
+            "timestamp": "2025-07-16T12:27:59.672000",
+            "source": "clickup",
+            "clickup_id": "4644972603886090697",
+            "task_name": "Поправить верстку как в дизайне",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 41,
+            "earnings": 209.17116666666666,
+            "timestamp": "2025-07-16T14:23:20.664000",
+            "source": "clickup",
+            "clickup_id": "4645088712253575165",
+            "task_name": "Поправить верстку характеристики",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 0,
+            "earnings": 302.62375,
+            "timestamp": "2025-07-16T15:51:36.245000",
+            "source": "clickup",
+            "clickup_id": "4645177601668489166",
+            "task_name": "Поправить верстку характеристики",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 23,
+            "earnings": 119.58116666666666,
+            "timestamp": "2025-07-16T16:56:50.986000",
+            "source": "clickup",
+            "clickup_id": "4645243277171043480",
+            "task_name": "Забрать данные доставка и оплата из общих данных сайта и вывести на страницу товара",
+            "description": ""
+          },
+          {
+            "hours": 2,
+            "minutes": 25,
+            "earnings": 725.23675,
+            "timestamp": "2025-07-16T17:26:38.057000",
+            "source": "clickup",
+            "clickup_id": "4645273221146161786",
+            "task_name": "Заполнить Tabs для товара",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-17": {
+        "total_hours": 2.983941111111111,
+        "total_earnings": 895.1823333333333,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 30,
+            "earnings": 153.30316666666667,
+            "timestamp": "2025-07-17T13:18:00.339000",
+            "source": "clickup",
+            "clickup_id": "4646472482818952297",
+            "task_name": "Поправить размер картинки в Hero на главной",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 59,
+            "earnings": 296.4145833333333,
+            "timestamp": "2025-07-17T15:33:22.874000",
+            "source": "clickup",
+            "clickup_id": "4646608758121505550",
+            "task_name": "Добавить галерею в описание товара",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 35,
+            "earnings": 176.67458333333332,
+            "timestamp": "2025-07-17T16:57:41.505000",
+            "source": "clickup",
+            "clickup_id": "4646693628554326870",
+            "task_name": "Картинка из текстового редактора должна отображаться,как в дизайне",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 40,
+            "earnings": 204.70525,
+            "timestamp": "2025-07-17T17:47:56.688000",
+            "source": "clickup",
+            "clickup_id": "4646744220047850655",
+            "task_name": "Поправить характеристики и комплектацию как дизайне",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 12,
+            "earnings": 64.08475,
+            "timestamp": "2025-07-17T18:39:47.867000",
+            "source": "clickup",
+            "clickup_id": "4646796414403019961",
+            "task_name": "Поправить характеристики и комплектацию как дизайне",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-18": {
+        "total_hours": 3.6003052777777778,
+        "total_earnings": 1080.0915833333333,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 45,
+            "earnings": 228.64883333333333,
+            "timestamp": "2025-07-18T13:00:41.440000",
+            "source": "clickup",
+            "clickup_id": "4647904655719597643",
+            "task_name": "Вывести текст из админки в верстку под таблицей характеристик и комплектации",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 29,
+            "earnings": 149.39158333333333,
+            "timestamp": "2025-07-18T13:53:07.376000",
+            "source": "clickup",
+            "clickup_id": "4647957394411556368",
+            "task_name": "Вывести текст из админки в верстку под таблицей характеристик и комплектации",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 5,
+            "earnings": 28.235416666666666,
+            "timestamp": "2025-07-18T14:23:46.080000",
+            "source": "clickup",
+            "clickup_id": "4647988245144867502",
+            "task_name": "Вывести текст из админки в верстку под таблицей характеристик и комплектации",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 53,
+            "earnings": 269.61875000000003,
+            "timestamp": "2025-07-18T14:44:20.623000",
+            "source": "clickup",
+            "clickup_id": "4648008958446736914",
+            "task_name": "Сверстать вопрос ответ на страницу категории товара,инфа в админке есть",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 1,
+            "earnings": 7.928083333333333,
+            "timestamp": "2025-07-18T15:56:25.906000",
+            "source": "clickup",
+            "clickup_id": "4648081533847809069",
+            "task_name": "Сверстать галерею на странице товара под описанием",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 19,
+            "earnings": 396.26891666666666,
+            "timestamp": "2025-07-18T16:02:37.955000",
+            "source": "clickup",
+            "clickup_id": "4648087777539076275",
+            "task_name": "Поправить верстку контактов,как в дизайне",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-21": {
+        "total_hours": 4.473691944444445,
+        "total_earnings": 1342.1075833333334,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 46,
+            "earnings": 231.76524999999998,
+            "timestamp": "2025-07-21T12:35:21.031000",
+            "source": "clickup",
+            "clickup_id": "4652227776593335342",
+            "task_name": "Вывод дополнительных услуг и другие товары в single-product",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 1,
+            "earnings": 309.69558333333333,
+            "timestamp": "2025-07-21T13:43:56.994000",
+            "source": "clickup",
+            "clickup_id": "4652296824366637620",
+            "task_name": "Вывод дополнительных услуг и другие товары в single-product",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 26,
+            "earnings": 133.769,
+            "timestamp": "2025-07-21T14:59:15.091000",
+            "source": "clickup",
+            "clickup_id": "4652372631982256232",
+            "task_name": "Вывод дополнительных услуг и другие товары в single-product",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 9,
+            "earnings": 47.80583333333334,
+            "timestamp": "2025-07-21T15:36:57.722000",
+            "source": "clickup",
+            "clickup_id": "4652410584242665345",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 21,
+            "earnings": 105.49508333333334,
+            "timestamp": "2025-07-21T15:46:31.552000",
+            "source": "clickup",
+            "clickup_id": "4652420221662738727",
+            "task_name": "Рефакторинг partial контакты",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 23,
+            "earnings": 115.739,
+            "timestamp": "2025-07-21T16:14:24.395000",
+            "source": "clickup",
+            "clickup_id": "4652448286371561204",
+            "task_name": "Создание отдельного additional_services для single/product",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 5,
+            "earnings": 326.99508333333335,
+            "timestamp": "2025-07-21T17:31:55.762000",
+            "source": "clickup",
+            "clickup_id": "4652526324601917164",
+            "task_name": "Создание отдельного additional_services для single/product",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 14,
+            "earnings": 70.84275,
+            "timestamp": "2025-07-21T18:41:55.233000",
+            "source": "clickup",
+            "clickup_id": "4652596773054651049",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-22": {
+        "total_hours": 1.0810972222222222,
+        "total_earnings": 324.32916666666665,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 0,
+            "earnings": 2.07075,
+            "timestamp": "2025-07-22T13:15:17.920000",
+            "source": "clickup",
+            "clickup_id": "4653717530744793484",
+            "task_name": "Закруглить фон шапки",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 4,
+            "earnings": 22.5275,
+            "timestamp": "2025-07-22T13:18:15.826000",
+            "source": "clickup",
+            "clickup_id": "4653720509908593157",
+            "task_name": "Закруглить фон шапки",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 23,
+            "earnings": 116.17716666666666,
+            "timestamp": "2025-07-22T13:32:37.697000",
+            "source": "clickup",
+            "clickup_id": "4653734971701013725",
+            "task_name": "Логотип везде должен быть красный,т.к. его запатентовали",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 7,
+            "earnings": 37.46716666666667,
+            "timestamp": "2025-07-22T14:37:23.380000",
+            "source": "clickup",
+            "clickup_id": "4653800164338514544",
+            "task_name": "Логотип везде должен быть красный,т.к. его запатентовали",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 29,
+            "earnings": 146.08658333333332,
+            "timestamp": "2025-07-22T18:42:42.505000",
+            "source": "clickup",
+            "clickup_id": "4654047091437152840",
+            "task_name": "Пофиксить баги если пользователь не заполнил данные в WP",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-23": {
+        "total_hours": 3.4434947222222223,
+        "total_earnings": 1033.0484166666665,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 9,
+            "earnings": 45.81366666666667,
+            "timestamp": "2025-07-23T12:00:43.233000",
+            "source": "clickup",
+            "clickup_id": "4655091988797662795",
+            "task_name": "В категории перенести перелинковку вниз страницы под описание",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 3,
+            "earnings": 17.523,
+            "timestamp": "2025-07-23T12:13:39.505000",
+            "source": "clickup",
+            "clickup_id": "4655105003689421068",
+            "task_name": "Пофиксить баги если пользователь не заполнил данные в WP",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 20,
+            "earnings": 102.19691666666667,
+            "timestamp": "2025-07-23T12:34:35.051000",
+            "source": "clickup",
+            "clickup_id": "4655126071057657250",
+            "task_name": "Добавить hover на галерею",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 2,
+            "earnings": 310.9573333333333,
+            "timestamp": "2025-07-23T13:17:39.713000",
+            "source": "clickup",
+            "clickup_id": "4655169437107566193",
+            "task_name": "Реализовать слайдер в Hero",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 5,
+            "earnings": 25.535416666666666,
+            "timestamp": "2025-07-23T14:22:43.379000",
+            "source": "clickup",
+            "clickup_id": "4655234929922998588",
+            "task_name": "Фикс паршиал услуги",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 10,
+            "earnings": 354.37283333333335,
+            "timestamp": "2025-07-23T14:27:52.170000",
+            "source": "clickup",
+            "clickup_id": "4655240109485785593",
+            "task_name": "Фикс паршиал услуги",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 3,
+            "earnings": 19.40275,
+            "timestamp": "2025-07-23T17:02:11.062000",
+            "source": "clickup",
+            "clickup_id": "4655395471824330500",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 5,
+            "earnings": 26.07375,
+            "timestamp": "2025-07-23T17:23:04.773000",
+            "source": "clickup",
+            "clickup_id": "4655416491964703526",
+            "task_name": "Добавить наполняемость на страницы",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 5,
+            "earnings": 28.658333333333335,
+            "timestamp": "2025-07-23T17:29:02.917000",
+            "source": "clickup",
+            "clickup_id": "4655422495322350640",
+            "task_name": "Исправление news gallery",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 20,
+            "earnings": 102.51441666666666,
+            "timestamp": "2025-07-23T17:35:23.235000",
+            "source": "clickup",
+            "clickup_id": "4655428874237977922",
+            "task_name": "Выводить данные FAQ из product",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-24": {
+        "total_hours": 22.959175000000002,
+        "total_earnings": 6887.7525000000005,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 17,
+            "earnings": 86.35399999999998,
+            "timestamp": "2025-07-24T12:17:00.898000",
+            "source": "clickup",
+            "clickup_id": "4656557958091320953",
+            "task_name": "Вывести картинку и описание в дополнительных услугах",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 15,
+            "earnings": 78.20158333333335,
+            "timestamp": "2025-07-24T12:34:34.920000",
+            "source": "clickup",
+            "clickup_id": "4656575625590288878",
+            "task_name": "Вывести картинку и описание в дополнительных услугах",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 17,
+            "earnings": 87.87858333333334,
+            "timestamp": "2025-07-24T12:50:52.854000",
+            "source": "clickup",
+            "clickup_id": "4656592037348193425",
+            "task_name": "Вывести иконки соц. сетей в header и cta",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 12,
+            "earnings": 62.24783333333333,
+            "timestamp": "2025-07-24T13:13:06.360000",
+            "source": "clickup",
+            "clickup_id": "4656614405420431450",
+            "task_name": "Ограничить высоту gallery, если проходит вертикальная фотография с WP",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 8,
+            "earnings": 40.19233333333334,
+            "timestamp": "2025-07-24T13:32:32.905000",
+            "source": "clickup",
+            "clickup_id": "4656633979700329405",
+            "task_name": "Добавить иконку в single Новости",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 2,
+            "earnings": 310.39341666666667,
+            "timestamp": "2025-07-24T13:58:11.763000",
+            "source": "clickup",
+            "clickup_id": "4656659805154131946",
+            "task_name": "Реализовать форму обратной связи",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 0,
+            "earnings": 302.19458333333336,
+            "timestamp": "2025-07-24T15:54:23.811000",
+            "source": "clickup",
+            "clickup_id": "4656776789342622588",
+            "task_name": "Реализовать форму обратной связи",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 4,
+            "earnings": 21.93466666666667,
+            "timestamp": "2025-07-24T16:55:39.664000",
+            "source": "clickup",
+            "clickup_id": "4656838444369911803",
+            "task_name": "Переделать hover-slide наведение на картинки",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 32,
+            "earnings": 162.85475000000002,
+            "timestamp": "2025-07-24T17:15:25.375000",
+            "source": "clickup",
+            "clickup_id": "4656858338524210071",
+            "task_name": "Переделать hover-slide наведение на картинки",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 0,
+            "earnings": 0.17608333333333331,
+            "timestamp": "2025-07-24T17:47:58.111000",
+            "source": "clickup",
+            "clickup_id": "4656891105383360657",
+            "task_name": "Убрать текст в production на странице Контакты",
+            "description": ""
+          },
+          {
+            "hours": 19,
+            "minutes": 7,
+            "earnings": 5735.324666666667,
+            "timestamp": "2025-07-24T17:48:02.977000",
+            "source": "clickup",
+            "clickup_id": "4656891218193361048",
+            "task_name": "Переделать hover-slide наведение на картинки",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-25": {
+        "total_hours": 4.955396666666666,
+        "total_earnings": 1486.619,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 53,
+            "earnings": 267.6025833333333,
+            "timestamp": "2025-07-25T12:55:04.939000",
+            "source": "clickup",
+            "clickup_id": "4658045837992866430",
+            "task_name": "Убрать текст в production на странице Контакты",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 32,
+            "earnings": 162.88316666666668,
+            "timestamp": "2025-07-25T14:06:51.895000",
+            "source": "clickup",
+            "clickup_id": "4658118073370099256",
+            "task_name": "Исправить вывод картинки в single дополнительные услуги",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 12,
+            "earnings": 63.30083333333334,
+            "timestamp": "2025-07-25T14:40:45.462000",
+            "source": "clickup",
+            "clickup_id": "4658152200005813073",
+            "task_name": "Вывод faq",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 2,
+            "earnings": 13.359916666666667,
+            "timestamp": "2025-07-25T14:55:40.121000",
+            "source": "clickup",
+            "clickup_id": "4658167216721429904",
+            "task_name": "Картинка для категорий товаров и дополнительных услуг",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 54,
+            "earnings": 272.87783333333334,
+            "timestamp": "2025-07-25T14:58:26.105000",
+            "source": "clickup",
+            "clickup_id": "4658169986438465020",
+            "task_name": "Вывод карточки товара",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 21,
+            "earnings": 106.06524999999999,
+            "timestamp": "2025-07-25T16:06:19.211000",
+            "source": "clickup",
+            "clickup_id": "4658238327756755403",
+            "task_name": "Карточки доп.услуг сверстать как в дизайне",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 46,
+            "earnings": 231.17533333333333,
+            "timestamp": "2025-07-25T16:27:35.367000",
+            "source": "clickup",
+            "clickup_id": "4658259733504660907",
+            "task_name": "Вывод карточки товара",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 35,
+            "earnings": 177.43025,
+            "timestamp": "2025-07-25T17:22:01.228000",
+            "source": "clickup",
+            "clickup_id": "4658314539854274392",
+            "task_name": "Карточки доп.услуг сверстать как в дизайне",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 8,
+            "earnings": 43.21483333333334,
+            "timestamp": "2025-07-25T18:00:46.135000",
+            "source": "clickup",
+            "clickup_id": "4658353540824901049",
+            "task_name": "Исправить вывод картинки в single дополнительные услуги",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 29,
+            "earnings": 148.709,
+            "timestamp": "2025-07-25T18:09:36.697000",
+            "source": "clickup",
+            "clickup_id": "4658362437614774016",
+            "task_name": "Не работает переход с главной страницы в товар вагонные весы",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-26": {
+        "total_hours": 5.28665361111111,
+        "total_earnings": 1585.9960833333332,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 1,
+            "earnings": 6.163083333333333,
+            "timestamp": "2025-07-26T11:47:32.574000",
+            "source": "clickup",
+            "clickup_id": "4659427399250542979",
+            "task_name": "Убрать лишнее \"от\"",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 2,
+            "earnings": 312.0594166666666,
+            "timestamp": "2025-07-26T11:52:12.433000",
+            "source": "clickup",
+            "clickup_id": "4659432084522992029",
+            "task_name": "Разделить категорию товара автовесы ПВТ на ПВТ-А и ПВТ-Б",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 13,
+            "earnings": 69.07549999999999,
+            "timestamp": "2025-07-26T12:59:25.353000",
+            "source": "clickup",
+            "clickup_id": "4659499743713231427",
+            "task_name": "Реализовать функционал, при нажатии на кнопку Подобрать весы в Hero моталось на секцию с бесплатной консультацией",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 32,
+            "earnings": 163.86291666666665,
+            "timestamp": "2025-07-26T13:20:06.672000",
+            "source": "clickup",
+            "clickup_id": "4659520581166498464",
+            "task_name": "Реализовать функционал, при нажатии на кнопку Подобрать весы в Hero моталось на секцию с бесплатной консультацией",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 5,
+            "earnings": 25.631416666666667,
+            "timestamp": "2025-07-26T13:52:54.367000",
+            "source": "clickup",
+            "clickup_id": "4659553602015920938",
+            "task_name": "Реализовать функционал, при нажатии на кнопку Подобрать весы в Hero моталось на секцию с бесплатной консультацией",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 13,
+            "earnings": 69.26950000000001,
+            "timestamp": "2025-07-26T14:00:52.799000",
+            "source": "clickup",
+            "clickup_id": "4659561619746784078",
+            "task_name": "Обрабатывать ошибку при отсутствии продукта в категории",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 8,
+            "earnings": 40.61216666666666,
+            "timestamp": "2025-07-26T14:16:22.518000",
+            "source": "clickup",
+            "clickup_id": "4659577208431248267",
+            "task_name": "Реализовать меню услуги",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 7,
+            "earnings": 35.336333333333336,
+            "timestamp": "2025-07-26T14:24:42.419000",
+            "source": "clickup",
+            "clickup_id": "4659585597576119213",
+            "task_name": "Реализация страницы \"О заводе\"",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 59,
+            "earnings": 299.3118333333333,
+            "timestamp": "2025-07-26T14:31:56.580000",
+            "source": "clickup",
+            "clickup_id": "4659592879827387339",
+            "task_name": "Реализовать меню услуги",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 10,
+            "earnings": 350.69233333333335,
+            "timestamp": "2025-07-26T15:33:42.333000",
+            "source": "clickup",
+            "clickup_id": "4659655061357266004",
+            "task_name": "Сверстать архив услуг",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 8,
+            "earnings": 40.72841666666667,
+            "timestamp": "2025-07-26T16:56:06.534000",
+            "source": "clickup",
+            "clickup_id": "4659738013248324954",
+            "task_name": "Сверстать архив услуг",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 34,
+            "earnings": 173.25316666666666,
+            "timestamp": "2025-07-26T17:04:58.145000",
+            "source": "clickup",
+            "clickup_id": "4659746925741671796",
+            "task_name": "Сверстать сингл услуги",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-27": {
+        "total_hours": 2.9554197222222225,
+        "total_earnings": 886.6259166666667,
+        "sessions": [
+          {
+            "hours": 2,
+            "minutes": 20,
+            "earnings": 703.2356666666667,
+            "timestamp": "2025-07-27T12:58:17.791000",
+            "source": "clickup",
+            "clickup_id": "4660948155549684078",
+            "task_name": "Реализация страницы \"О заводе\"",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 1,
+            "earnings": 7.09775,
+            "timestamp": "2025-07-27T15:29:38.525000",
+            "source": "clickup",
+            "clickup_id": "4661100512702960543",
+            "task_name": "Изменить архивные карточки",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 35,
+            "earnings": 176.2925,
+            "timestamp": "2025-07-27T15:32:09.338000",
+            "source": "clickup",
+            "clickup_id": "4661103043143340967",
+            "task_name": "Доработка паршиал реализованные проекты",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-28": {
+        "total_hours": 6.6605927777777785,
+        "total_earnings": 1998.1778333333334,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 31,
+            "earnings": 159.30016666666668,
+            "timestamp": "2025-07-28T11:19:13.048000",
+            "source": "clickup",
+            "clickup_id": "4662298004413023878",
+            "task_name": "Вывести доп.оснащение на страницу товара",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 14,
+            "earnings": 73.02391666666666,
+            "timestamp": "2025-07-28T11:56:27.464000",
+            "source": "clickup",
+            "clickup_id": "4662335472650752056",
+            "task_name": "Пофиксить услуги при наведении на маленьких экранах",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 11,
+            "earnings": 55.534666666666666,
+            "timestamp": "2025-07-28T12:11:50.063000",
+            "source": "clickup",
+            "clickup_id": "4662350948692988840",
+            "task_name": "Отрефакторить hero",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 13,
+            "earnings": 366.8104166666667,
+            "timestamp": "2025-07-28T12:23:15.154000",
+            "source": "clickup",
+            "clickup_id": "4662362444743382735",
+            "task_name": "Убрать статику в паршиал реализованные проекты",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 30,
+            "earnings": 153.01508333333334,
+            "timestamp": "2025-07-28T13:37:20.199000",
+            "source": "clickup",
+            "clickup_id": "4662437026514937615",
+            "task_name": "Убрать статику из паршиал hit-of-sales",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 41,
+            "earnings": 209.50416666666666,
+            "timestamp": "2025-07-28T14:15:13.733000",
+            "source": "clickup",
+            "clickup_id": "4662475165774196076",
+            "task_name": "Рефакторинг возвращаемых типов данных и проверок",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 14,
+            "earnings": 372.98966666666666,
+            "timestamp": "2025-07-28T15:03:03.960000",
+            "source": "clickup",
+            "clickup_id": "4662523318800037559",
+            "task_name": "Реализовать бургер-меню для мобильных устройств",
+            "description": ""
+          },
+          {
+            "hours": 1,
+            "minutes": 46,
+            "earnings": 532.8105,
+            "timestamp": "2025-07-28T16:19:08.653000",
+            "source": "clickup",
+            "clickup_id": "4662599907546040067",
+            "task_name": "Исправить отображение сайта на мобильных устройствах",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 15,
+            "earnings": 75.18925,
+            "timestamp": "2025-07-28T18:07:27.442000",
+            "source": "clickup",
+            "clickup_id": "4662708941078994036",
+            "task_name": "Исправить отображение сайта на мобильных устройствах",
+            "description": ""
+          }
+        ]
+      },
+      "2025-07-29": {
+        "total_hours": 5.6932672222222225,
+        "total_earnings": 1707.9801666666667,
+        "sessions": [
+          {
+            "hours": 0,
+            "minutes": 59,
+            "earnings": 296.11775,
+            "timestamp": "2025-07-29T11:57:01.605000",
+            "source": "clickup",
+            "clickup_id": "4663785601014505873",
+            "task_name": "Исправить отображение dots в hover-slide на мобильных устройствах",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 27,
+            "earnings": 138.32791666666668,
+            "timestamp": "2025-07-29T12:57:15.422000",
+            "source": "clickup",
+            "clickup_id": "4663846211005787518",
+            "task_name": "Фикс вывода характеристик на карточках товаров",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 18,
+            "earnings": 91.40058333333333,
+            "timestamp": "2025-07-29T13:25:17.699000",
+            "source": "clickup",
+            "clickup_id": "4663874435869913736",
+            "task_name": "Исправить отображение FAQ",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 3,
+            "earnings": 19.24725,
+            "timestamp": "2025-07-29T13:52:12.016000",
+            "source": "clickup",
+            "clickup_id": "4663901530285225965",
+            "task_name": "Добавить ссылку на карточки товаров в архиве",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 14,
+            "earnings": 74.59625,
+            "timestamp": "2025-07-29T13:56:19.347000",
+            "source": "clickup",
+            "clickup_id": "4663905671992653981",
+            "task_name": "Фикс вывода характеристик на карточках товаров",
+            "description": ""
+          },
+          {
+            "hours": 0,
+            "minutes": 31,
+            "earnings": 155.88066666666666,
+            "timestamp": "2025-07-29T14:12:34.536000",
+            "source": "clickup",
+            "clickup_id": "4663922088699837275",
+            "task_name": "Исправить отображение сайта на мобильных устройствах",
+            "description": ""
+          },
+          {
+            "hours": 3,
+            "minutes": 6,
+            "earnings": 932.40975,
+            "timestamp": "2025-07-29T14:43:52.609000",
+            "source": "clickup",
+            "clickup_id": "4663953543379353794",
+            "task_name": "Убрать статику на главной странице",
+            "description": ""
+          }
+        ]
+      }
+    },
+    "clickup_synced_entries": [
+      "4655091988797662795",
+      "4662437026514937615",
+      "4623444145209153722",
+      "4643835673563704917",
+      "4633373789521776475",
+      "4642338174277589475",
+      "4655240109485785593",
+      "4640750468615443255",
+      "4653720509908593157",
+      "4656838444369911803",
+      "4663901530285225965",
+      "4661103043143340967",
+      "4637902466691435448",
+      "4662335472650752056",
+      "4633736397286347940",
+      "4637958173742666982",
+      "4637874861124683473",
+      "4659432084522992029",
+      "4656659805154131946",
+      "4659553602015920938",
+      "4662298004413023878",
+      "4645243277171043480",
+      "4663922088699837275",
+      "4652227776593335342",
+      "4626417511071287234",
+      "4646744220047850655",
+      "4655416491964703526",
+      "4656592037348193425",
+      "4642197900830260695",
+      "4633497995664238470",
+      "4655395471824330500",
+      "4646693628554326870",
+      "4644972603886090697",
+      "4656557958091320953",
+      "4621913294780575000",
+      "4638069147074111486",
+      "4624816542785013830",
+      "4660948155549684078",
+      "4646608758121505550",
+      "4634817605927770604",
+      "4659746925741671796",
+      "4658118073370099256",
+      "4663785601014505873",
+      "4637722692530548081",
+      "4662362444743382735",
+      "4643509797970063144",
+      "4642243412820297214",
+      "4656891218193361048",
+      "4647988245144867502",
+      "4656614405420431450",
+      "4653734971701013725",
+      "4637757649823019801",
+      "4652410584242665345",
+      "4645088712253575165",
+      "4652420221662738727",
+      "4659499743713231427",
+      "4647904655719597643",
+      "4659520581166498464",
+      "4642108093869403128",
+      "4648008958446736914",
+      "4652448286371561204",
+      "4627614956795010121",
+      "4626486088931546090",
+      "4661100512702960543",
+      "4662523318800037559",
+      "4652526324601917164",
+      "4626216120507769560",
+      "4659585597576119213",
+      "4658314539854274392",
+      "4654047091437152840",
+      "4658362437614774016",
+      "4642425982585481771",
+      "4648087777539076275",
+      "4623610165324496573",
+      "4653800164338514544",
+      "4626338207788513377",
+      "4622029207022407227",
+      "4647957394411556368",
+      "4636302186841450833",
+      "4637758762471207749",
+      "4659655061357266004",
+      "4659427399250542979",
+      "4645273221146161786",
+      "4643842888924213166",
+      "4658353540824901049",
+      "4662708941078994036",
+      "4665232518588216787",
+      "4653717530744793484",
+      "4663953543379353794",
+      "4624655730300756370",
+      "4662475165774196076",
+      "4656858338524210071",
+      "4658045837992866430",
+      "4658238327756755403",
+      "4659561619746784078",
+      "4624960567668189864",
+      "4626186652233833743",
+      "4655428874237977922",
+      "4655105003689421068",
+      "4652596773054651049",
+      "4665210976340881792",
+      "4623564643184227700",
+      "4643676742711316263",
+      "4659592879827387339",
+      "4636491420030276627",
+      "4637750632232333793",
+      "4658152200005813073",
+      "4646796414403019961",
+      "4648081533847809069",
+      "4642299660399874487",
+      "4656776789342622588",
+      "4656891105383360657",
+      "4656575625590288878",
+      "4624928209317470588",
+      "4655234929922998588",
+      "4621888197709604919",
+      "4646472482818952297",
+      "4645177601668489166",
+      "4652372631982256232",
+      "4658259733504660907",
+      "4658167216721429904",
+      "4656633979700329405",
+      "4652296824366637620",
+      "4655169437107566193",
+      "4642250498794915651",
+      "4659738013248324954",
+      "4643863280036426510",
+      "4655126071057657250",
+      "4638013869855153870",
+      "4655422495322350640",
+      "4663905671992653981",
+      "4662350948692988840",
+      "4634995792091626082",
+      "4663846211005787518",
+      "4662599907546040067",
+      "4659577208431248267",
+      "4663874435869913736",
+      "4658169986438465020"
+    ],
+    "clickup_settings": {
+      "api_token": "pk_200457076_O4EJ7QJ3CSVZLPUUP11U0797GO0WMV5V",
+      "workspace_id": "9015893221",
+      "team_id": "9015893221"
     }
   }
 }
