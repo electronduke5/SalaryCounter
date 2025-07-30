@@ -458,6 +458,54 @@ class ClickUpClient:
                 all_tasks.extend(tasks)
         
         return all_tasks
+    
+    async def get_list_statuses(self, list_id: str) -> List[Dict]:
+        """Получение доступных статусов для конкретного списка"""
+        async def _fetch_statuses():
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                url = f"{self.base_url}/list/{list_id}"
+                headers = self._get_headers()
+                
+                logger.info(f"ClickUp API request: GET {url} (для получения статусов)")
+                
+                async with session.get(url, headers=headers) as response:
+                    response_text = await response.text()
+                    logger.info(f"ClickUp API response: {response.status}")
+                    
+                    if response.status == 200:
+                        data = await response.json()
+                        statuses = data.get('statuses', [])
+                        logger.info(f"Получено статусов: {len(statuses)}")
+                        logger.info(f"Сырые данные статусов из API: {statuses}")
+                        
+                        # Форматируем статусы для удобства использования
+                        formatted_statuses = []
+                        for status in statuses:
+                            status_name = status.get('status', 'Unknown')
+                            formatted_status = {
+                                'key': status_name.lower(),
+                                'name': status_name,
+                                'color': status.get('color', '#000000')
+                            }
+                            formatted_statuses.append(formatted_status)
+                            logger.info(f"Отформатирован статус: {formatted_status}")
+                        
+                        return formatted_statuses
+                    else:
+                        raise aiohttp.ClientError(f"HTTP {response.status}: {response_text}")
+        
+        try:
+            return await retry_with_backoff(_fetch_statuses)
+        except Exception as e:
+            logger.error(f"Ошибка получения статусов списка: {e}")
+            # Возвращаем fallback статусы
+            return [
+                {"key": "open", "name": "Open", "color": "#ff6b6b"},
+                {"key": "in progress", "name": "In Progress", "color": "#4ecdc4"},
+                {"key": "review", "name": "Review", "color": "#45b7d1"},
+                {"key": "done", "name": "Done", "color": "#96ceb4"},
+                {"key": "complete", "name": "Complete", "color": "#ffeaa7"}
+            ]
 
 
 class SalaryStates(StatesGroup):
@@ -560,6 +608,323 @@ class SalaryBot:
         russian_month = months.get(english_month, english_month.lower())
         year = date.strftime('%Y')
         return f"{russian_month} {year}"
+
+    def escape_markdown(self, text: str) -> str:
+        """Экранирование специальных символов для Telegram Markdown"""
+        if not text:
+            return ""
+        
+        # Символы, которые нужно экранировать в Markdown
+        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        
+        escaped_text = text
+        for char in special_chars:
+            escaped_text = escaped_text.replace(char, f'\\{char}')
+        
+        return escaped_text
+
+    def create_earnings_keyboard(self, current_report: str) -> InlineKeyboardMarkup:
+        """Создание клавиатуры для переключения между отчетами о заработке"""
+        keyboard = []
+        
+        # Первый ряд: основные периоды
+        row1 = []
+        reports = [
+            ("earnings_today", "📊 Сегодня" if current_report == "today" else "Сегодня"),
+            ("earnings_yesterday", "📊 Вчера" if current_report == "yesterday" else "Вчера"),
+            ("earnings_week", "📊 Неделя" if current_report == "week" else "Неделя"),
+            ("earnings_month", "📊 Месяц" if current_report == "month" else "Месяц")
+        ]
+        
+        for callback_data, text in reports:
+            row1.append(InlineKeyboardButton(text=text, callback_data=callback_data))
+        
+        # Разделяем на два ряда по 2 кнопки
+        keyboard.append(row1[:2])
+        keyboard.append(row1[2:])
+        
+        # Второй ряд: детальные отчеты
+        row2 = []
+        detail_reports = [
+            ("earnings_week_details", "📊 Неделя детально" if current_report == "week_details" else "Неделя детально"),
+            ("earnings_month_weeks", "📊 Месяц по неделям" if current_report == "month_weeks" else "Месяц по неделям"),
+            ("earnings_year", "📊 Год" if current_report == "year" else "Год")
+        ]
+        
+        for callback_data, text in detail_reports:
+            row2.append(InlineKeyboardButton(text=text, callback_data=callback_data))
+        
+        # Добавляем детальные отчеты в отдельном ряду
+        if len(row2) <= 2:
+            keyboard.append(row2)
+        else:
+            keyboard.append(row2[:2])
+            keyboard.append(row2[2:])
+        
+        return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+    async def send_earnings_report(self, message: Message, report_type: str, content: str, show_navigation: bool = True):
+        """Универсальная функция для отправки отчетов о заработке с inline кнопками"""
+        if show_navigation:
+            keyboard = self.create_earnings_keyboard(report_type)
+            await message.answer(content, reply_markup=keyboard)
+        else:
+            await message.answer(content)
+
+    def generate_today_report(self, user_data: Dict[str, Any]) -> str:
+        """Генерация отчета за сегодня"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        if today in user_data["work_sessions"]:
+            session = user_data["work_sessions"][today]
+            return (
+                f"📊 Заработок за сегодня ({datetime.now().strftime('%d.%m.%Y')}):\n\n"
+                f"⏰ Отработано: {self.format_hours_minutes(session['total_hours'])}\n"
+                f"💰 Заработано: {session['total_earnings']:.2f} руб"
+            )
+        else:
+            return "📊 Сегодня вы еще не добавляли рабочее время"
+
+    def generate_yesterday_report(self, user_data: Dict[str, Any]) -> str:
+        """Генерация отчета за вчера"""
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        
+        if yesterday in user_data["work_sessions"]:
+            session = user_data["work_sessions"][yesterday]
+            return (
+                f"📊 Заработок за вчера ({(datetime.now() - timedelta(days=1)).strftime('%d.%m.%Y')}):\n\n"
+                f"⏰ Отработано: {self.format_hours_minutes(session['total_hours'])}\n"
+                f"💰 Заработано: {session['total_earnings']:.2f} руб"
+            )
+        else:
+            return "📊 Вчера вы не добавляли рабочее время"
+
+    def generate_week_report(self, user_data: Dict[str, Any]) -> str:
+        """Генерация отчета за неделю"""
+        today = datetime.now()
+        monday = today - timedelta(days=today.weekday())
+        
+        total_hours = 0
+        total_earnings = 0
+        days_worked = 0
+        
+        current_date = monday
+        while current_date <= today:
+            date_str = current_date.strftime("%Y-%m-%d")
+            if date_str in user_data["work_sessions"]:
+                session = user_data["work_sessions"][date_str]
+                total_hours += session["total_hours"]
+                total_earnings += session["total_earnings"]
+                days_worked += 1
+            current_date += timedelta(days=1)
+        
+        if days_worked > 0:
+            return (
+                f"📊 Заработок за неделю (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}):\n\n"
+                f"📅 Рабочих дней: {days_worked}\n"
+                f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
+                f"💰 Всего заработано: {total_earnings:.2f} руб\n"
+                f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
+            )
+        else:
+            return f"📊 На этой неделе (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}) нет записей о работе"
+
+    def generate_month_report(self, user_data: Dict[str, Any]) -> str:
+        """Генерация отчета за месяц (30 дней)"""
+        total_hours = 0
+        total_earnings = 0
+        days_worked = 0
+        
+        for i in range(30):
+            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            if date in user_data["work_sessions"]:
+                session = user_data["work_sessions"][date]
+                total_hours += session["total_hours"]
+                total_earnings += session["total_earnings"]
+                days_worked += 1
+        
+        if days_worked > 0:
+            return (
+                f"📊 Заработок за месяц:\n\n"
+                f"📅 Рабочих дней: {days_worked}\n"
+                f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
+                f"💰 Всего заработано: {total_earnings:.2f} руб\n"
+                f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
+            )
+        else:
+            return "📊 За последний месяц нет записей о работе"
+
+    def generate_week_details_report(self, user_data: Dict[str, Any]) -> str:
+        """Генерация детального отчета за неделю"""
+        today = datetime.now()
+        monday = today - timedelta(days=today.weekday())
+        
+        days_names = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+        total_hours = 0
+        total_earnings = 0
+        response_lines = [f"📊 Детальный заработок за неделю (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}):\n"]
+        
+        current_date = monday
+        day_index = 0
+        while current_date <= today:
+            date_str = current_date.strftime("%Y-%m-%d")
+            day_name = days_names[day_index]
+            
+            if date_str in user_data["work_sessions"]:
+                session = user_data["work_sessions"][date_str]
+                hours = session["total_hours"]
+                earnings = session["total_earnings"]
+                total_hours += hours
+                total_earnings += earnings
+                response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): {self.format_hours_minutes(hours)} = {earnings:.2f} руб")
+            else:
+                response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): 0ч = 0 руб")
+            
+            current_date += timedelta(days=1)
+            day_index += 1
+        
+        if total_hours > 0:
+            response_lines.extend([
+                "",
+                f"📊 Итого за неделю:",
+                f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}",
+                f"💰 Всего заработано: {total_earnings:.2f} руб"
+            ])
+        else:
+            response_lines.extend(["", "📊 На этой неделе нет записей о работе"])
+        
+        return "\n".join(response_lines)
+
+    def generate_month_weeks_report(self, user_data: Dict[str, Any]) -> str:
+        """Генерация отчета по неделям в текущем месяце"""
+        today = datetime.now()
+        first_day_of_month = today.replace(day=1)
+        
+        if today.month == 12:
+            last_day_of_month = today.replace(day=31)
+        else:
+            last_day_of_month = today.replace(day=1, month=today.month+1) - timedelta(days=1)
+        
+        weeks_data = []
+        total_month_hours = 0
+        total_month_earnings = 0
+        week_number = 1
+        
+        current_start = first_day_of_month
+        
+        while current_start <= today and current_start.month == today.month:
+            if current_start == first_day_of_month:
+                days_until_sunday = (6 - current_start.weekday()) % 7
+                week_end = current_start + timedelta(days=days_until_sunday)
+            else:
+                week_end = current_start + timedelta(days=6)
+            
+            week_end = min(week_end, last_day_of_month, today)
+            
+            week_hours = 0
+            week_earnings = 0
+            
+            current_date = current_start
+            while current_date <= week_end:
+                date_str = current_date.strftime("%Y-%m-%d")
+                if date_str in user_data["work_sessions"]:
+                    session = user_data["work_sessions"][date_str]
+                    week_hours += session["total_hours"]
+                    week_earnings += session["total_earnings"]
+                current_date += timedelta(days=1)
+            
+            if week_hours > 0:
+                weeks_data.append({
+                    'number': week_number,
+                    'start': current_start,
+                    'end': week_end,
+                    'hours': week_hours,
+                    'earnings': week_earnings
+                })
+                total_month_hours += week_hours
+                total_month_earnings += week_earnings
+            
+            if current_start == first_day_of_month:
+                days_until_sunday = (6 - current_start.weekday()) % 7
+                current_start = current_start + timedelta(days=days_until_sunday + 1)
+            else:
+                current_start += timedelta(days=7)
+            
+            week_number += 1
+        
+        if weeks_data:
+            response_lines = [f"📊 Заработок по неделям в {self.get_russian_month_year(today)}:\n"]
+            
+            for week in weeks_data:
+                response_lines.append(
+                    f"📅 Неделя {week['number']} ({week['start'].strftime('%d.%m')} - {week['end'].strftime('%d.%m')}): "
+                    f"{self.format_hours_minutes(week['hours'])} = {week['earnings']:.2f} руб"
+                )
+            
+            response_lines.extend([
+                "",
+                f"📊 Итого за месяц:",
+                f"📅 Недель с работой: {len(weeks_data)}",
+                f"⏰ Всего отработано: {self.format_hours_minutes(total_month_hours)}",
+                f"💰 Всего заработано: {total_month_earnings:.2f} руб"
+            ])
+        else:
+            response_lines = [f"📊 В {self.get_russian_month_year(today)} нет записей о работе"]
+        
+        return "\n".join(response_lines)
+
+    def generate_year_report(self, user_data: Dict[str, Any]) -> str:
+        """Генерация отчета за год по месяцам"""
+        current_year = datetime.now().year
+        
+        months_data = {}
+        total_year_hours = 0
+        total_year_earnings = 0
+        
+        for date_str, session in user_data["work_sessions"].items():
+            try:
+                session_date = datetime.strptime(date_str, "%Y-%m-%d")
+                
+                if session_date.year == current_year:
+                    month_key = session_date.strftime("%Y-%m")
+                    
+                    if month_key not in months_data:
+                        months_data[month_key] = {
+                            'hours': 0,
+                            'earnings': 0,
+                            'date_obj': session_date
+                        }
+                    
+                    months_data[month_key]['hours'] += session["total_hours"]
+                    months_data[month_key]['earnings'] += session["total_earnings"]
+                    total_year_hours += session["total_hours"]
+                    total_year_earnings += session["total_earnings"]
+                    
+            except ValueError:
+                continue
+        
+        if months_data:
+            response_lines = [f"📊 Заработок по месяцам в {current_year} году:\n"]
+            
+            sorted_months = sorted(months_data.items(), key=lambda x: x[1]['date_obj'])
+            
+            for month_key, data in sorted_months:
+                month_name = self.get_russian_month_year(data['date_obj'])
+                response_lines.append(
+                    f"📅 {month_name}: {self.format_hours_minutes(data['hours'])} = {data['earnings']:.2f} руб"
+                )
+            
+            response_lines.extend([
+                "",
+                f"📊 Итого за {current_year} год:",
+                f"📅 Месяцев с работой: {len(months_data)}",
+                f"⏰ Всего отработано: {self.format_hours_minutes(total_year_hours)}",
+                f"💰 Всего заработано: {total_year_earnings:.2f} руб"
+            ])
+        else:
+            response_lines = [f"📊 В {current_year} году нет записей о работе"]
+        
+        return "\n".join(response_lines)
 
     def get_user_clickup_client(self, user_id: str) -> Optional[ClickUpClient]:
         """Получение ClickUp клиента для конкретного пользователя"""
@@ -771,20 +1136,29 @@ class SalaryBot:
         # URL задачи
         task_url = task_data.get('url', '')
         
+        # Экранируем все текстовые поля для Markdown
+        escaped_name = self.escape_markdown(name)
+        escaped_status = self.escape_markdown(status)
+        escaped_project = self.escape_markdown(project)
+        escaped_list_name = self.escape_markdown(list_name)
+        escaped_assignee_text = self.escape_markdown(assignee_text)
+        escaped_due_text = self.escape_markdown(due_text)
+        
         info_text = (
-            f"📋 *{name}*\n\n"
-            f"📊 *Статус:* {status}\n"
-            f"🏗 *Проект:* {project}\n"
-            f"📁 *Список:* {list_name}\n"
-            f"👤 *Исполнитель:* {assignee_text}\n"
-            f"⏰ *Дедлайн:* {due_text}\n\n"
+            f"📋 *{escaped_name}*\n\n"
+            f"📊 *Статус:* {escaped_status}\n"
+            f"🏗 *Проект:* {escaped_project}\n"
+            f"📁 *Список:* {escaped_list_name}\n"
+            f"👤 *Исполнитель:* {escaped_assignee_text}\n"
+            f"⏰ *Дедлайн:* {escaped_due_text}\n\n"
         )
         
         if description and description.strip():
             # Ограничиваем длину описания
             if len(description) > 200:
                 description = description[:200] + "..."
-            info_text += f"📝 *Описание:*\n{description}\n\n"
+            escaped_description = self.escape_markdown(description)
+            info_text += f"📝 *Описание:*\n{escaped_description}\n\n"
         
         if task_url:
             info_text += f"🔗 [Открыть в ClickUp]({task_url})"
@@ -884,6 +1258,252 @@ class SalaryBot:
             filtered_tasks.append(task)
         
         return filtered_tasks
+    
+    def filter_tasks_by_status(self, tasks: List[Dict], status_key: str) -> List[Dict]:
+        """Фильтрация задач по статусу - теперь используем точные названия из ClickUp API"""
+        logger.info(f"=== ФИЛЬТРАЦИЯ ЗАДАЧ ПО СТАТУСУ ===")
+        logger.info(f"Ищем статус: '{status_key}'")
+        logger.info(f"Всего задач для фильтрации: {len(tasks)}")
+        
+        if status_key == "all":
+            logger.info(f"Статус 'all' - возвращаем все {len(tasks)} задач")
+            return tasks
+        
+        filtered_tasks = []
+        
+        # Логируем все статусы задач для анализа
+        task_statuses = []
+        for i, task in enumerate(tasks):
+            task_status_obj = task.get('status', {})
+            task_status_name = task_status_obj.get('status', '')
+            task_name = task.get('name', 'Без названия')[:50]
+            
+            task_statuses.append(task_status_name)
+            logger.info(f"Задача {i+1}: '{task_name}' имеет статус: '{task_status_name}'")
+            logger.info(f"  Полный объект статуса: {task_status_obj}")
+            
+            # Сравниваем точно по названию
+            if task_status_name.lower() == status_key.lower():
+                filtered_tasks.append(task)
+                logger.info(f"  ✅ Задача соответствует фильтру!")
+            else:
+                logger.info(f"  ❌ Не соответствует: '{task_status_name.lower()}' != '{status_key.lower()}'")
+        
+        unique_statuses = list(set(task_statuses))
+        logger.info(f"Уникальные статусы в задачах: {unique_statuses}")
+        logger.info(f"Результат фильтрации: найдено {len(filtered_tasks)} из {len(tasks)} задач")
+        
+        return filtered_tasks
+    
+    async def get_statuses_from_tasks(self, clickup_client: ClickUpClient, list_id: str) -> List[Dict]:
+        """Извлечение уникальных статусов из самих задач - fallback метод"""
+        logger.info(f"Извлекаем статусы из задач списка {list_id}")
+        
+        try:
+            # Получаем все задачи из списка (без фильтра по assignee)
+            all_tasks = await clickup_client.get_tasks(list_id)
+            logger.info(f"Получено {len(all_tasks)} задач для извлечения статусов")
+            
+            if not all_tasks:
+                logger.warning("Нет задач в списке для извлечения статусов")
+                return [{"key": "all", "name": "🔄 Все задачи", "color": "#666666"}]
+            
+            # Извлекаем уникальные статусы
+            unique_statuses = {}
+            for task in all_tasks:
+                status_obj = task.get('status', {})
+                status_name = status_obj.get('status', '')
+                status_color = status_obj.get('color', '#000000')
+                
+                if status_name and status_name not in unique_statuses:
+                    unique_statuses[status_name] = {
+                        'key': status_name.lower(),
+                        'name': status_name,
+                        'color': status_color
+                    }
+                    logger.info(f"Найден уникальный статус: {status_name}")
+            
+            # Формируем итоговый список
+            statuses = [{"key": "all", "name": "🔄 Все задачи", "color": "#666666"}]
+            statuses.extend(list(unique_statuses.values()))
+            
+            logger.info(f"Извлечено {len(statuses)-1} уникальных статусов из задач: {[s['name'] for s in statuses[1:]]}")
+            return statuses
+            
+        except Exception as e:
+            logger.error(f"Ошибка при извлечении статусов из задач: {e}")
+            return [{"key": "all", "name": "🔄 Все задачи", "color": "#666666"}]
+    
+    async def send_task_with_navigation(self, message, tasks: List[Dict], current_index: int, list_id: str, space_id: str = None, folder_id: str = None):
+        """Отправка задачи с навигационными кнопками"""
+        if not tasks or current_index >= len(tasks):
+            await message.answer("❌ Нет задач для отображения")
+            return
+            
+        task = tasks[current_index]
+        task_name = task.get('name', 'Без названия')
+        task_status = task.get('status', {}).get('status', 'Неизвестен')
+        
+        # Получаем информацию об исполнителе
+        assignees = task.get('assignees', [])
+        if assignees:
+            assignee_name = assignees[0].get('username', 'Неизвестный')
+        else:
+            assignee_name = 'Не назначен'
+        
+        # Получаем дедлайн
+        due_date = task.get('due_date')
+        due_text = "Не установлен"
+        if due_date:
+            try:
+                due_timestamp = int(due_date) / 1000
+                due_datetime = datetime.fromtimestamp(due_timestamp)
+                due_text = due_datetime.strftime('%d.%m.%Y')
+            except:
+                due_text = "Некорректная дата"
+        
+        # Экранируем текст для Markdown
+        escaped_name = self.escape_markdown(task_name)
+        escaped_status = self.escape_markdown(task_status)
+        escaped_assignee = self.escape_markdown(assignee_name)
+        escaped_due = self.escape_markdown(due_text)
+        
+        # Формируем текст задачи
+        task_text = (
+            f"📋 *{escaped_name}*\n"
+            f"📊 Статус: {escaped_status}\n"
+            f"👤 Исполнитель: {escaped_assignee}\n"
+            f"⏰ Дедлайн: {escaped_due}\n\n"
+            f"Задача {current_index + 1} из {len(tasks)}"
+        )
+        
+        # Создаем клавиатуру с навигацией
+        keyboard = self.create_task_navigation_keyboard(tasks, current_index, list_id, space_id, folder_id)
+        
+        await message.answer(
+            task_text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+    
+    def create_task_navigation_keyboard(self, tasks: List[Dict], current_index: int, list_id: str, space_id: str = None, folder_id: str = None) -> InlineKeyboardMarkup:
+        """Создание клавиатуры с навигацией по задачам"""
+        task = tasks[current_index]
+        task_id = task.get('id')
+        keyboard = []
+        
+        # Первая строка: Навигация
+        nav_row = []
+        if len(tasks) > 1:
+            # Предыдущая задача (с циклической навигацией)
+            prev_index = (current_index - 1) % len(tasks)
+            nav_row.append(InlineKeyboardButton(
+                text="◀️ Пред",
+                callback_data=f"task_nav_prev_{list_id}_{current_index}_{prev_index}"
+            ))
+        
+        # Подробная информация о задаче
+        nav_row.append(InlineKeyboardButton(
+            text="📋 Инфо",
+            callback_data=f"task_info_{task_id}"
+        ))
+        
+        if len(tasks) > 1:
+            # Следующая задача (с циклической навигацией)
+            next_index = (current_index + 1) % len(tasks)
+            nav_row.append(InlineKeyboardButton(
+                text="▶️ След",
+                callback_data=f"task_nav_next_{list_id}_{current_index}_{next_index}"
+            ))
+        
+        keyboard.append(nav_row)
+        
+        # Вторая строка: Управление таймером
+        timer_row = [
+            InlineKeyboardButton(text="⏱️ Старт", callback_data=f"timer_start_{task_id}"),
+            InlineKeyboardButton(text="⏹️ Стоп", callback_data=f"timer_stop_{task_id}")
+        ]
+        keyboard.append(timer_row)
+        
+        # Третья строка: Изменение статуса
+        status_row = [
+            InlineKeyboardButton(text="🔄 Статус", callback_data=f"task_status_change_{task_id}")
+        ]
+        keyboard.append(status_row)
+        
+        # Четвертая строка: Назад к спискам
+        if folder_id:
+            back_callback = f"folder_select_{space_id}_{folder_id}"
+            back_text = "🔙 К спискам"
+        elif space_id:
+            back_callback = f"space_select_{space_id}"
+            back_text = "🔙 К папкам"
+        else:
+            # Fallback на старый способ
+            back_callback = f"back_to_lists"
+            back_text = "🔙 Назад"
+        
+        back_row = [
+            InlineKeyboardButton(
+                text=back_text,
+                callback_data=back_callback
+            )
+        ]
+        keyboard.append(back_row)
+        
+        return InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    async def update_task_navigation(self, message, tasks: List[Dict], current_index: int, list_id: str):
+        """Обновление сообщения с задачей при навигации"""
+        if not tasks or current_index >= len(tasks):
+            await message.edit_text("❌ Нет задач для отображения")
+            return
+            
+        task = tasks[current_index]
+        task_name = task.get('name', 'Без названия')
+        task_status = task.get('status', {}).get('status', 'Неизвестен')
+        
+        # Получаем информацию об исполнителе
+        assignees = task.get('assignees', [])
+        if assignees:
+            assignee_name = assignees[0].get('username', 'Неизвестный')
+        else:
+            assignee_name = 'Не назначен'
+        
+        # Получаем дедлайн
+        due_date = task.get('due_date')
+        due_text = "Не установлен"
+        if due_date:
+            try:
+                due_timestamp = int(due_date) / 1000
+                due_datetime = datetime.fromtimestamp(due_timestamp)
+                due_text = due_datetime.strftime('%d.%m.%Y')
+            except:
+                due_text = "Некорректная дата"
+        
+        # Экранируем текст для Markdown
+        escaped_name = self.escape_markdown(task_name)
+        escaped_status = self.escape_markdown(task_status)
+        escaped_assignee = self.escape_markdown(assignee_name)
+        escaped_due = self.escape_markdown(due_text)
+        
+        # Формируем текст задачи
+        task_text = (
+            f"📋 *{escaped_name}*\n"
+            f"📊 Статус: {escaped_status}\n"
+            f"👤 Исполнитель: {escaped_assignee}\n"
+            f"⏰ Дедлайн: {escaped_due}\n\n"
+            f"Задача {current_index + 1} из {len(tasks)}"
+        )
+        
+        # Создаем клавиатуру с навигацией
+        keyboard = self.create_task_navigation_keyboard(tasks, current_index, list_id)
+        
+        await message.edit_text(
+            task_text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
     
     def create_projects_keyboard(self, projects: List[Dict]) -> InlineKeyboardMarkup:
         """Создание клавиатуры для выбора проекта"""
@@ -1351,12 +1971,53 @@ class SalaryBot:
             user_data["clickup_settings"] = {
                 "api_token": None,
                 "workspace_id": None,
-                "team_id": None
+                "team_id": None,
+                "user_id": None,
+                "username": None
             }
             self.save_data()
             
             await message.answer("🗑 Настройки ClickUp сброшены.\n\n"
                                 "Для повторной настройки используйте /clickup_setup")
+        
+        @self.dp.message(Command("clickup_refresh"))
+        async def clickup_refresh_command(message: Message):
+            user_id = str(message.from_user.id)
+            clickup_client = self.get_user_clickup_client(user_id)
+            
+            if not clickup_client:
+                await message.answer("❌ ClickUp не настроен для вашего аккаунта\n\nИспользуйте /clickup_setup для настройки")
+                return
+            
+            await message.answer("🔄 Обновляю информацию о пользователе ClickUp...")
+            
+            try:
+                # Получаем актуальную информацию о пользователе
+                current_user = await clickup_client.get_current_user()
+                
+                if not current_user or not current_user.get('id'):
+                    await message.answer("❌ Не удалось получить информацию о пользователе из ClickUp API\n\n"
+                                        "Проверьте:\n"
+                                        "• Корректность API токена\n"
+                                        "• Доступ к интернету\n"
+                                        "• Статус ClickUp API")
+                    return
+                
+                # Сохраняем обновленную информацию
+                user_data = self.get_user_data(user_id)
+                user_data["clickup_settings"]["user_id"] = current_user.get('id')
+                user_data["clickup_settings"]["username"] = current_user.get('username', current_user.get('email', 'Unknown'))
+                self.save_data()
+                
+                await message.answer(f"✅ Информация о пользователе обновлена!\n\n"
+                                    f"👤 Имя пользователя: {user_data['clickup_settings']['username']}\n"
+                                    f"🆔 User ID: {current_user.get('id')}\n\n"
+                                    f"Теперь команда /tasks будет показывать только ваши задачи.")
+                
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении информации о пользователе: {e}")
+                await message.answer(f"❌ Ошибка обновления: {str(e)}\n\n"
+                                    f"Попробуйте позже или обратитесь к администратору.")
 
         @self.dp.message(Command("tasksummary"))
         async def task_summary_command(message: Message):
@@ -1551,8 +2212,20 @@ class SalaryBot:
             # Проверяем активные таймеры
             current_timer = await clickup_client.get_current_timer()
             
+            user_data = self.get_user_data(user_id)
+            clickup_username = user_data["clickup_settings"].get("username", "Неизвестно")
+            clickup_user_id = user_data["clickup_settings"].get("user_id")
+            
             response = "✅ ClickUp интеграция активна\n\n"
+            response += f"👤 Пользователь: {clickup_username}\n"
             response += f"🏢 Team ID: {team_id}\n"
+            
+            # Проверяем наличие user_id
+            if clickup_user_id:
+                response += f"🆔 User ID: ✅ Настроен\n"
+            else:
+                response += f"🆔 User ID: ❌ Отсутствует\n"
+                response += f"⚠️ *Рекомендация:* Используйте /clickup_refresh\n"
             
             if current_timer:
                 task_name = "Неизвестная задача"
@@ -1564,9 +2237,12 @@ class SalaryBot:
             else:
                 response += "\n⏹ Активных таймеров нет"
             
-            user_data = self.get_user_data(user_id)
             synced_count = len(user_data.get("clickup_synced_entries", set()))
             response += f"\n\n📊 Синхронизировано записей: {synced_count}"
+            
+            # Дополнительная информация если user_id отсутствует
+            if not clickup_user_id:
+                response += f"\n\n💡 *Информация:*\nБез User ID команда /tasks будет показывать все задачи вместо только ваших."
             
             await message.answer(response)
 
@@ -1574,309 +2250,50 @@ class SalaryBot:
         async def today_command(message: Message):
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
-
-            today = datetime.now().strftime("%Y-%m-%d")
-
-            if today in user_data["work_sessions"]:
-                session = user_data["work_sessions"][today]
-                response = (
-                    f"📊 Заработок за сегодня ({datetime.now().strftime('%d.%m.%Y')}):\n\n"
-                    f"⏰ Отработано: {self.format_hours_minutes(session['total_hours'])}\n"
-                    f"💰 Заработано: {session['total_earnings']:.2f} руб"
-                )
-            else:
-                response = "📊 Сегодня вы еще не добавляли рабочее время"
-
-            await message.answer(response)
+            content = self.generate_today_report(user_data)
+            await self.send_earnings_report(message, "today", content)
 
         @self.dp.message(Command("yesterday"))
         async def yesterday_command(message: Message):
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
-
-            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-
-            if yesterday in user_data["work_sessions"]:
-                session = user_data["work_sessions"][yesterday]
-                response = (
-                    f"📊 Заработок за вчера ({(datetime.now() - timedelta(days=1)).strftime('%d.%m.%Y')}):\n\n"
-                    f"⏰ Отработано: {self.format_hours_minutes(session['total_hours'])}\n"
-                    f"💰 Заработано: {session['total_earnings']:.2f} руб"
-                )
-            else:
-                response = "📊 Вчера вы не добавляли рабочее время"
-
-            await message.answer(response)
+            content = self.generate_yesterday_report(user_data)
+            await self.send_earnings_report(message, "yesterday", content)
 
         @self.dp.message(Command("week"))
         async def week_command(message: Message):
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
-
-            # Найти понедельник текущей недели
-            today = datetime.now()
-            monday = today - timedelta(days=today.weekday())
-            
-            total_hours = 0
-            total_earnings = 0
-            days_worked = 0
-
-            # Подсчет с понедельника до сегодня
-            current_date = monday
-            while current_date <= today:
-                date_str = current_date.strftime("%Y-%m-%d")
-                if date_str in user_data["work_sessions"]:
-                    session = user_data["work_sessions"][date_str]
-                    total_hours += session["total_hours"]
-                    total_earnings += session["total_earnings"]
-                    days_worked += 1
-                current_date += timedelta(days=1)
-
-            if days_worked > 0:
-                response = (
-                    f"📊 Заработок за неделю (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}):\n\n"
-                    f"📅 Рабочих дней: {days_worked}\n"
-                    f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
-                    f"💰 Всего заработано: {total_earnings:.2f} руб\n"
-                    f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
-                )
-            else:
-                response = f"📊 На этой неделе (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}) нет записей о работе"
-
-            await message.answer(response)
+            content = self.generate_week_report(user_data)
+            await self.send_earnings_report(message, "week", content)
 
         @self.dp.message(Command("weekdetails"))
         async def week_details_command(message: Message):
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
-
-            # Найти понедельник текущей недели
-            today = datetime.now()
-            monday = today - timedelta(days=today.weekday())
-            
-            days_names = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
-            total_hours = 0
-            total_earnings = 0
-            response_lines = [f"📊 Детальный заработок за неделю (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}):\n"]
-
-            # Проход по каждому дню недели
-            current_date = monday
-            day_index = 0
-            while current_date <= today:
-                date_str = current_date.strftime("%Y-%m-%d")
-                day_name = days_names[day_index]
-                
-                if date_str in user_data["work_sessions"]:
-                    session = user_data["work_sessions"][date_str]
-                    hours = session["total_hours"]
-                    earnings = session["total_earnings"]
-                    total_hours += hours
-                    total_earnings += earnings
-                    response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): {self.format_hours_minutes(hours)} = {earnings:.2f} руб")
-                else:
-                    response_lines.append(f"📅 {day_name} ({current_date.strftime('%d.%m')}): 0ч = 0 руб")
-                
-                current_date += timedelta(days=1)
-                day_index += 1
-
-            if total_hours > 0:
-                response_lines.extend([
-                    "",
-                    f"📊 Итого за неделю:",
-                    f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}",
-                    f"💰 Всего заработано: {total_earnings:.2f} руб"
-                ])
-            else:
-                response_lines.extend(["", "📊 На этой неделе нет записей о работе"])
-
-            await message.answer("\n".join(response_lines))
+            content = self.generate_week_details_report(user_data)
+            await self.send_earnings_report(message, "week_details", content)
 
         @self.dp.message(Command("month"))
         async def month_command(message: Message):
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
-
-            # Последние 30 дней
-            total_hours = 0
-            total_earnings = 0
-            days_worked = 0
-
-            for i in range(30):
-                date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
-                if date in user_data["work_sessions"]:
-                    session = user_data["work_sessions"][date]
-                    total_hours += session["total_hours"]
-                    total_earnings += session["total_earnings"]
-                    days_worked += 1
-
-            if days_worked > 0:
-                response = (
-                    f"📊 Заработок за месяц:\n\n"
-                    f"📅 Рабочих дней: {days_worked}\n"
-                    f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
-                    f"💰 Всего заработано: {total_earnings:.2f} руб\n"
-                    f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
-                )
-            else:
-                response = "📊 За последний месяц нет записей о работе"
-
-            await message.answer(response)
+            content = self.generate_month_report(user_data)
+            await self.send_earnings_report(message, "month", content)
 
         @self.dp.message(Command("monthweeks"))
         async def month_weeks_command(message: Message):
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
-
-            # Получить первый и последний день текущего месяца
-            today = datetime.now()
-            first_day_of_month = today.replace(day=1)
-            
-            # Последний день месяца
-            if today.month == 12:
-                last_day_of_month = today.replace(day=31)
-            else:
-                last_day_of_month = today.replace(day=1, month=today.month+1) - timedelta(days=1)
-            
-            weeks_data = []
-            total_month_hours = 0
-            total_month_earnings = 0
-            week_number = 1
-            
-            current_start = first_day_of_month
-            
-            # Проходим по неделям внутри месяца
-            while current_start <= today and current_start.month == today.month:
-                # Определяем конец недели
-                if current_start == first_day_of_month:
-                    # Первая неделя: от 1 числа до ближайшего воскресенья
-                    days_until_sunday = (6 - current_start.weekday()) % 7
-                    week_end = current_start + timedelta(days=days_until_sunday)
-                else:
-                    # Обычная неделя: 7 дней от понедельника
-                    week_end = current_start + timedelta(days=6)
-                
-                # Ограничиваем концом месяца и сегодняшним днем
-                week_end = min(week_end, last_day_of_month, today)
-                
-                week_hours = 0
-                week_earnings = 0
-                
-                # Подсчет для текущей недели
-                current_date = current_start
-                while current_date <= week_end:
-                    date_str = current_date.strftime("%Y-%m-%d")
-                    if date_str in user_data["work_sessions"]:
-                        session = user_data["work_sessions"][date_str]
-                        week_hours += session["total_hours"]
-                        week_earnings += session["total_earnings"]
-                    current_date += timedelta(days=1)
-                
-                if week_hours > 0:
-                    weeks_data.append({
-                        'number': week_number,
-                        'start': current_start,
-                        'end': week_end,
-                        'hours': week_hours,
-                        'earnings': week_earnings
-                    })
-                    total_month_hours += week_hours
-                    total_month_earnings += week_earnings
-                
-                # Переход к следующей неделе
-                if current_start == first_day_of_month:
-                    # После первой недели переходим к понедельнику
-                    days_until_sunday = (6 - current_start.weekday()) % 7
-                    current_start = current_start + timedelta(days=days_until_sunday + 1)
-                else:
-                    # Обычный переход на следующий понедельник
-                    current_start += timedelta(days=7)
-                
-                week_number += 1
-
-            if weeks_data:
-                response_lines = [f"📊 Заработок по неделям в {self.get_russian_month_year(today)}:\n"]
-                
-                for week in weeks_data:
-                    response_lines.append(
-                        f"📅 Неделя {week['number']} ({week['start'].strftime('%d.%m')} - {week['end'].strftime('%d.%m')}): "
-                        f"{self.format_hours_minutes(week['hours'])} = {week['earnings']:.2f} руб"
-                    )
-                
-                response_lines.extend([
-                    "",
-                    f"📊 Итого за месяц:",
-                    f"📅 Недель с работой: {len(weeks_data)}",
-                    f"⏰ Всего отработано: {self.format_hours_minutes(total_month_hours)}",
-                    f"💰 Всего заработано: {total_month_earnings:.2f} руб"
-                ])
-            else:
-                response_lines = [f"📊 В {self.get_russian_month_year(today)} нет записей о работе"]
-
-            await message.answer("\n".join(response_lines))
+            content = self.generate_month_weeks_report(user_data)
+            await self.send_earnings_report(message, "month_weeks", content)
 
         @self.dp.message(Command("year"))
         async def year_command(message: Message):
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
-
-            # Получить текущий год
-            current_year = datetime.now().year
-            
-            # Словарь для хранения данных по месяцам
-            months_data = {}
-            total_year_hours = 0
-            total_year_earnings = 0
-            
-            # Проходим по всем рабочим сессиям пользователя
-            for date_str, session in user_data["work_sessions"].items():
-                try:
-                    session_date = datetime.strptime(date_str, "%Y-%m-%d")
-                    
-                    # Проверяем, что дата относится к текущему году
-                    if session_date.year == current_year:
-                        # Получаем ключ месяца в формате YYYY-MM
-                        month_key = session_date.strftime("%Y-%m")
-                        
-                        if month_key not in months_data:
-                            months_data[month_key] = {
-                                'hours': 0,
-                                'earnings': 0,
-                                'date_obj': session_date  # Для сортировки
-                            }
-                        
-                        months_data[month_key]['hours'] += session["total_hours"]
-                        months_data[month_key]['earnings'] += session["total_earnings"]
-                        total_year_hours += session["total_hours"]
-                        total_year_earnings += session["total_earnings"]
-                        
-                except ValueError:
-                    # Пропускаем некорректные даты
-                    continue
-            
-            if months_data:
-                response_lines = [f"📊 Заработок по месяцам в {current_year} году:\n"]
-                
-                # Сортируем месяцы по дате
-                sorted_months = sorted(months_data.items(), key=lambda x: x[1]['date_obj'])
-                
-                for month_key, data in sorted_months:
-                    month_name = self.get_russian_month_year(data['date_obj'])
-                    response_lines.append(
-                        f"📅 {month_name}: {self.format_hours_minutes(data['hours'])} = {data['earnings']:.2f} руб"
-                    )
-                
-                response_lines.extend([
-                    "",
-                    f"📊 Итого за год:",
-                    f"📅 Месяцев с работой: {len(months_data)}",
-                    f"⏰ Всего отработано: {self.format_hours_minutes(total_year_hours)}",
-                    f"💰 Всего заработано: {total_year_earnings:.2f} руб",
-                    f"📈 Среднее в месяц: {total_year_earnings / len(months_data):.2f} руб"
-                ])
-            else:
-                response_lines = [f"📊 В {current_year} году нет записей о работе"]
-
-            await message.answer("\n".join(response_lines))
+            content = self.generate_year_report(user_data)
+            await self.send_earnings_report(message, "year", content)
 
         @self.dp.message(Command("tasks"))
         async def tasks_command(message: Message):
@@ -2401,119 +2818,44 @@ class SalaryBot:
                 await callback.answer("❌ ClickUp не настроен", show_alert=True)
                 return
             
-            await callback.answer("📊 Выбор статуса...")
-            
-            # Получаем информацию о списке для отображения
-            if folder_id:
-                lists = await clickup_client.get_lists(space_id, folder_id)
-            else:
-                lists = await clickup_client.get_lists(space_id)
-            
-            list_name = "Неизвестный список"
-            for list_item in lists:
-                if list_item.get('id') == list_id:
-                    list_name = list_item.get('name', list_name)
-                    break
-            
-            # Создаем клавиатуру для выбора статуса
-            keyboard = []
-            statuses = self.get_available_statuses()
-            
-            # Добавляем кнопки статусов по 2 в строке
-            for i in range(0, len(statuses), 2):
-                row = []
-                for j in range(2):
-                    if i + j < len(statuses):
-                        status = statuses[i + j]
-                        row.append(
-                            InlineKeyboardButton(
-                                text=status['name'],
-                                callback_data=f"final_status_select_{list_id}_{status['key']}"
-                            )
-                        )
-                keyboard.append(row)
-            
-            # Кнопка "Назад"
-            if folder_id:
-                back_callback = f"folder_select_{space_id}_{folder_id}"
-                back_text = "🔙 Назад к спискам"
-            else:
-                back_callback = f"space_select_{space_id}"
-                back_text = "🔙 Назад к папкам"
-            
-            keyboard.append([
-                InlineKeyboardButton(
-                    text=back_text,
-                    callback_data=back_callback
-                )
-            ])
-            
-            keyboard_markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-            
-            status_text = (
-                f"📋 *{list_name}*\n\n"
-                f"Выберите статус задач для просмотра:"
-            )
-            
-            await callback.message.edit_text(
-                status_text,
-                reply_markup=keyboard_markup,
-                parse_mode="Markdown"
-            )
-        
-        @self.dp.callback_query(F.data.startswith("final_status_select_"))
-        async def handle_final_status_select(callback: CallbackQuery):
-            parts = callback.data.split("_", 3)  # final_status_select_{list_id}_{status}
-            list_id = parts[2]
-            status = parts[3]
-            
-            user_id = str(callback.from_user.id)
-            clickup_client = self.get_user_clickup_client(user_id)
-            user_data = self.get_user_data(user_id)
-            
-            if not clickup_client:
-                await callback.answer("❌ ClickUp не настроен", show_alert=True)
-                return
-            
-            # Получаем ID текущего пользователя
-            clickup_user_id = user_data["clickup_settings"].get("user_id")
-            if not clickup_user_id:
-                await callback.answer("❌ Не найден ID пользователя ClickUp", show_alert=True)
-                return
-            
-            await callback.answer("🔄 Загрузка ваших задач...")
+            await callback.answer("🔄 Загрузка всех задач проекта...")
             
             try:
-                # Получаем задачи из конкретного списка, назначенные на текущего пользователя
-                if status == "all":
-                    tasks = await clickup_client.get_tasks(list_id, clickup_user_id)
-                else:
-                    # Получаем все задачи пользователя и фильтруем по статусу
-                    all_tasks = await clickup_client.get_tasks(list_id, clickup_user_id)
-                    tasks = [task for task in all_tasks 
-                            if task.get('status', {}).get('status', '').lower() == status.lower()]
+                # Сразу загружаем ВСЕ задачи из списка
+                tasks = await clickup_client.get_tasks(list_id)
                 
                 if not tasks:
                     # Получаем название списка для отображения
-                    list_details = None
-                    try:
-                        # Пытаемся получить детали списка (это может потребовать дополнительный API вызов)
-                        list_name = "Выбранный список"
-                    except:
-                        list_name = "Выбранный список"
+                    if folder_id:
+                        lists = await clickup_client.get_lists(space_id, folder_id)
+                    else:
+                        lists = await clickup_client.get_lists(space_id)
                     
-                    status_display = status.title() if status != 'all' else 'Все'
+                    list_name = "Неизвестный список"
+                    for list_item in lists:
+                        if list_item.get('id') == list_id:
+                            list_name = list_item.get('name', list_name)
+                            break
                     
-                    # Создаем кнопку назад 
+                    escaped_list_name = self.escape_markdown(list_name)
+                    
+                    # Кнопка назад
+                    if folder_id:
+                        back_callback = f"folder_select_{space_id}_{folder_id}"
+                        back_text = "🔙 Назад к спискам"
+                    else:
+                        back_callback = f"space_select_{space_id}"
+                        back_text = "🔙 Назад к папкам"
+                    
                     back_keyboard = InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(
-                            text="🔙 Назад к статусам",
-                            callback_data=f"back_to_list_{list_id}"
+                            text=back_text,
+                            callback_data=back_callback
                         )]
                     ])
                     
                     await callback.message.edit_text(
-                        f"📋 *{list_name}*\n📊 Статус: {status_display}\n\n❌ У вас нет задач с данным статусом",
+                        f"📋 *{escaped_list_name}*\n\n❌ В этом списке нет задач",
                         reply_markup=back_keyboard,
                         parse_mode="Markdown"
                     )
@@ -2521,20 +2863,27 @@ class SalaryBot:
                 
                 # Получаем название списка из первой задачи
                 list_name = tasks[0].get('list', {}).get('name', 'Неизвестный список')
-                status_display = status.title() if status != 'all' else 'Все'
+                escaped_list_name = self.escape_markdown(list_name)
                 
+                # Показываем заголовок
                 header_text = (
-                    f"📋 *{list_name}*\n"
-                    f"📊 Статус: {status_display}\n"
-                    f"👤 Ваших задач: {len(tasks)}\n\n"
-                    f"Управляйте задачами с помощью кнопок:"
+                    f"📋 *{escaped_list_name}*\n"
+                    f"📄 Всего задач: {len(tasks)}\n\n"
+                    f"Навигация по задачам:"
                 )
                 
-                # Кнопка назад к статусам
+                # Кнопка назад
+                if folder_id:
+                    back_callback = f"folder_select_{space_id}_{folder_id}"
+                    back_text = "🔙 Назад к спискам"
+                else:
+                    back_callback = f"space_select_{space_id}"
+                    back_text = "🔙 Назад к папкам"
+                
                 back_keyboard = InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text="🔙 Назад к статусам",
-                        callback_data=f"back_to_list_{list_id}"
+                        text=back_text,
+                        callback_data=back_callback
                     )]
                 ])
                 
@@ -2544,37 +2893,20 @@ class SalaryBot:
                     parse_mode="Markdown"
                 )
                 
-                # Отправляем задачи с кнопками управления
-                for task in tasks:
-                    task_name = task.get('name', 'Без названия')
-                    task_status = task.get('status', {}).get('status', 'Неизвестен')
-                    
-                    # Ограничиваем длину названия
-                    if len(task_name) > 50:
-                        display_name = task_name[:50] + "..."
-                    else:
-                        display_name = task_name
-                    
-                    keyboard = self.create_task_keyboard(task)
-                    
-                    await callback.message.answer(
-                        f"📋 *{display_name}*\n📊 {task_status}",
-                        reply_markup=keyboard,
-                        parse_mode="Markdown"
-                    )
-                    
-                    # Небольшая пауза между сообщениями
-                    await asyncio.sleep(0.1)
-                    
+                # Сразу показываем первую задачу с навигацией
+                current_index = 0
+                await self.send_task_with_navigation(callback.message, tasks, current_index, list_id, space_id, folder_id)
+                
             except Exception as e:
                 logger.error(f"Ошибка при получении задач: {e}")
                 await callback.message.edit_text(f"❌ Ошибка загрузки задач: {str(e)}")
         
-        @self.dp.callback_query(F.data.startswith("status_select_"))
-        async def handle_status_select(callback: CallbackQuery):
-            parts = callback.data.split("_", 3)  # status_select_{project_id}_{status}
-            project_id = parts[2]
-            status = parts[3]
+        @self.dp.callback_query(F.data.startswith("task_nav_prev_"))
+        async def handle_task_nav_prev(callback: CallbackQuery):
+            parts = callback.data.split("_")  # task_nav_prev_{list_id}_{current_index}_{prev_index}
+            list_id = parts[3]
+            current_index = int(parts[4])
+            prev_index = int(parts[5])
             
             user_id = str(callback.from_user.id)
             clickup_client = self.get_user_clickup_client(user_id)
@@ -2583,130 +2915,155 @@ class SalaryBot:
                 await callback.answer("❌ ClickUp не настроен", show_alert=True)
                 return
             
-            await callback.answer("🔄 Загрузка задач...")
+            await callback.answer("◀️ Предыдущая задача")
             
             try:
-                # Получаем все задачи пользователя
-                all_tasks = await clickup_client.get_user_tasks()
+                # Получаем все задачи снова (можно кешировать позже)
+                tasks = await clickup_client.get_tasks(list_id)
                 
-                if not all_tasks:
-                    await callback.message.edit_text("📋 У вас нет задач в ClickUp")
-                    return
-                
-                # Фильтруем задачи по проекту и статусу
-                filtered_tasks = self.filter_tasks_by_project_and_status(all_tasks, project_id, status)
-                
-                if not filtered_tasks:
-                    # Получаем названия для отображения
-                    project_name = "Неизвестный проект"
-                    status_name = status
-                    
-                    for task in all_tasks:
-                        if task.get('space', {}).get('id') == project_id:
-                            project_name = task.get('project_name', project_name)
-                            break
-                    
-                    # Создаем кнопку назад к статусам
-                    back_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(
-                            text="🔙 Назад к статусам",
-                            callback_data=f"project_select_{project_id}"
-                        )]
-                    ])
-                    
-                    await callback.message.edit_text(
-                        f"📋 В проекте *{project_name}* нет задач со статусом *{status_name}*",
-                        reply_markup=back_keyboard,
-                        parse_mode="Markdown"
-                    )
-                    return
-                
-                # Отправляем первое сообщение с информацией
-                project_name = filtered_tasks[0].get('project_name', 'Неизвестный проект')
-                status_display = status.title() if status != 'all' else 'Все'
-                
-                header_text = (
-                    f"🏗 *{project_name}*\n"
-                    f"📊 Статус: {status_display}\n"
-                    f"📋 Найдено задач: {len(filtered_tasks)}\n\n"
-                    f"Управляйте задачами с помощью кнопок:"
-                )
-                
-                # Кнопка назад к статусам
-                back_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(
-                        text="🔙 Назад к статусам",
-                        callback_data=f"project_select_{project_id}"
-                    )]
-                ])
-                
-                await callback.message.edit_text(
-                    header_text,
-                    reply_markup=back_keyboard,
-                    parse_mode="Markdown"
-                )
-                
-                # Отправляем задачи с кнопками управления
-                for task in filtered_tasks:
-                    task_name = task.get('name', 'Без названия')
-                    task_status = task.get('status', {}).get('status', 'Неизвестен')
-                    
-                    # Ограничиваем длину названия
-                    if len(task_name) > 50:
-                        display_name = task_name[:50] + "..."
-                    else:
-                        display_name = task_name
-                    
-                    keyboard = self.create_task_keyboard(task)
-                    
-                    await callback.message.answer(
-                        f"📋 *{display_name}*\n📊 {task_status}",
-                        reply_markup=keyboard,
-                        parse_mode="Markdown"
-                    )
-                    
-                    # Небольшая пауза между сообщениями
-                    await asyncio.sleep(0.1)
+                if tasks and prev_index < len(tasks):
+                    await self.update_task_navigation(callback.message, tasks, prev_index, list_id)
+                else:
+                    await callback.message.edit_text("❌ Ошибка навигации по задачам")
                     
             except Exception as e:
-                logger.error(f"Ошибка при получении задач: {e}")
-                await callback.message.edit_text(f"❌ Ошибка загрузки задач: {str(e)}")
+                logger.error(f"Ошибка навигации к предыдущей задаче: {e}")
+                await callback.message.edit_text(f"❌ Ошибка: {str(e)}")
         
-        @self.dp.callback_query(F.data == "back_to_projects")
-        async def handle_back_to_projects(callback: CallbackQuery):
-            user_id = str(callback.from_user.id)
+        @self.dp.callback_query(F.data.startswith("task_nav_next_"))
+        async def handle_task_nav_next(callback: CallbackQuery):
+            parts = callback.data.split("_")  # task_nav_next_{list_id}_{current_index}_{next_index}
+            list_id = parts[3]
+            current_index = int(parts[4])
+            next_index = int(parts[5])
             
-            if not self.get_user_clickup_client(user_id):
+            user_id = str(callback.from_user.id)
+            clickup_client = self.get_user_clickup_client(user_id)
+            
+            if not clickup_client:
                 await callback.answer("❌ ClickUp не настроен", show_alert=True)
                 return
             
-            await callback.answer("🔄 Загрузка проектов...")
+            await callback.answer("▶️ Следующая задача")
             
-            # Получаем проекты пользователя
-            result = await self.get_user_projects(user_id)
+            try:
+                # Получаем все задачи снова (можно кешировать позже)
+                tasks = await clickup_client.get_tasks(list_id)
+                
+                if tasks and next_index < len(tasks):
+                    await self.update_task_navigation(callback.message, tasks, next_index, list_id)
+                else:
+                    await callback.message.edit_text("❌ Ошибка навигации по задачам")
+                    
+            except Exception as e:
+                logger.error(f"Ошибка навигации к следующей задаче: {e}")
+                await callback.message.edit_text(f"❌ Ошибка: {str(e)}")
+        
+        @self.dp.callback_query(F.data.startswith("task_status_change_"))
+        async def handle_task_status_change(callback: CallbackQuery):
+            task_id = callback.data.split("_")[-1]  # task_status_change_{task_id}
             
-            if not result["success"]:
-                await callback.message.edit_text(f"❌ Ошибка получения проектов: {result['error']}")
-                return
+            await callback.answer("🔄 Выберите новый статус")
             
-            if result["total"] == 0:
-                await callback.message.edit_text("📋 У вас нет проектов с задачами в ClickUp")
-                return
+            # Создаем клавиатуру с доступными статусами
+            keyboard = []
+            statuses = [
+                ("open", "📂 Open"),
+                ("in progress", "🔄 In Progress"),
+                ("review", "👀 Review"), 
+                ("done", "✅ Done"),
+                ("complete", "🏁 Complete")
+            ]
             
-            # Создаем клавиатуру с проектами
-            keyboard = self.create_projects_keyboard(result["projects"])
+            for status_key, status_label in statuses:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        text=status_label, 
+                        callback_data=f"task_status_{status_key}_{task_id}"
+                    )
+                ])
             
-            projects_text = (
-                f"🏗 *Ваши проекты*\n\n"
-                f"Найдено проектов: {result['total']}\n"
-                f"Выберите проект для просмотра задач:"
-            )
+            keyboard.append([
+                InlineKeyboardButton(text="🔙 Назад", callback_data=f"task_back_{task_id}")
+            ])
+            
+            status_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard)
             
             await callback.message.edit_text(
-                projects_text,
-                reply_markup=keyboard,
-                parse_mode="Markdown"
+                "🔄 Выберите новый статус для задачи:",
+                reply_markup=status_keyboard
             )
+
+        # Обработчики callback для отчетов о заработке
+        @self.dp.callback_query(F.data == "earnings_today")
+        async def handle_earnings_today(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_today_report(user_data)
+            
+            keyboard = self.create_earnings_keyboard("today")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "earnings_yesterday")
+        async def handle_earnings_yesterday(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_yesterday_report(user_data)
+            
+            keyboard = self.create_earnings_keyboard("yesterday")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "earnings_week")
+        async def handle_earnings_week(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_week_report(user_data)
+            
+            keyboard = self.create_earnings_keyboard("week")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "earnings_month")
+        async def handle_earnings_month(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_month_report(user_data)
+            
+            keyboard = self.create_earnings_keyboard("month")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "earnings_week_details")
+        async def handle_earnings_week_details(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_week_details_report(user_data)
+            
+            keyboard = self.create_earnings_keyboard("week_details")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "earnings_month_weeks")
+        async def handle_earnings_month_weeks(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_month_weeks_report(user_data)
+            
+            keyboard = self.create_earnings_keyboard("month_weeks")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "earnings_year")
+        async def handle_earnings_year(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_year_report(user_data)
+            
+            keyboard = self.create_earnings_keyboard("year")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
 
     async def start_bot(self):
         """Запуск бота"""
