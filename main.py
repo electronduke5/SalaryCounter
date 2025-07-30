@@ -68,24 +68,38 @@ class ClickUpClient:
         async def _fetch_team_id():
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
                 url = f"{self.base_url}/team"
-                async with session.get(url, headers=self._get_headers()) as response:
+                headers = self._get_headers()
+                logger.info(f"ClickUp API request: GET {url}")
+                logger.info(f"Headers: {headers}")
+                
+                async with session.get(url, headers=headers) as response:
+                    response_text = await response.text()
+                    logger.info(f"ClickUp API response: {response.status}")
+                    logger.info(f"Response body: {response_text}")
+                    
                     if response.status == 200:
                         data = await response.json()
                         teams = data.get('teams', [])
+                        logger.info(f"Available teams: {[team.get('id') for team in teams]}")
+                        logger.info(f"Looking for workspace_id: {self.workspace_id}")
+                        
                         for team in teams:
                             if team.get('id') == self.workspace_id:
                                 self.team_id = self.workspace_id
+                                logger.info(f"Found matching team_id: {self.team_id}")
                                 return self.team_id
                         # Если не найден точно, берем первый доступный
                         if teams:
                             self.team_id = teams[0]['id']
+                            logger.info(f"Using first available team_id: {self.team_id}")
                             return self.team_id
+                        logger.warning("No teams available")
                     elif response.status == 401:
                         raise ValueError("Неверный API токен ClickUp")
                     elif response.status == 403:
                         raise ValueError("Нет доступа к API ClickUp")
                     else:
-                        raise aiohttp.ClientError(f"HTTP {response.status}")
+                        raise aiohttp.ClientError(f"HTTP {response.status}: {response_text}")
                     return None
         
         try:
@@ -108,11 +122,22 @@ class ClickUpClient:
                     'start_date': int(start_date.timestamp() * 1000),
                     'end_date': int(end_date.timestamp() * 1000)
                 }
+                headers = self._get_headers()
                 
-                async with session.get(url, headers=self._get_headers(), params=params) as response:
+                logger.info(f"ClickUp API request: GET {url}")
+                logger.info(f"Params: {params}")
+                logger.info(f"Headers: {headers}")
+                
+                async with session.get(url, headers=headers, params=params) as response:
+                    response_text = await response.text()
+                    logger.info(f"ClickUp API response: {response.status}")
+                    logger.info(f"Response body length: {len(response_text)}")
+                    
                     if response.status == 200:
                         data = await response.json()
-                        return data.get('data', [])
+                        entries = data.get('data', [])
+                        logger.info(f"Retrieved {len(entries)} time entries")
+                        return entries
                     elif response.status == 401:
                         raise ValueError("Неверный API токен ClickUp")
                     elif response.status == 403:
@@ -120,7 +145,7 @@ class ClickUpClient:
                     elif response.status == 429:
                         raise aiohttp.ClientError("Превышен лимит запросов API")
                     else:
-                        raise aiohttp.ClientError(f"HTTP {response.status}")
+                        raise aiohttp.ClientError(f"HTTP {response.status}: {response_text}")
         
         try:
             return await retry_with_backoff(_fetch_time_entries)
@@ -144,6 +169,8 @@ class ClickUpClient:
 class SalaryStates(StatesGroup):
     waiting_for_rate = State()
     waiting_for_time = State()
+    waiting_for_clickup_token = State()
+    waiting_for_workspace_id = State()
 
 
 class SalaryBot:
@@ -151,12 +178,6 @@ class SalaryBot:
         self.bot = Bot(token=token)
         self.dp = Dispatcher(storage=MemoryStorage())
         self.data = self.load_data()
-        
-        # Инициализация ClickUp клиента
-        self.clickup_client = None
-        if CLICKUP_API_TOKEN and CLICKUP_WORKSPACE_ID:
-            self.clickup_client = ClickUpClient(CLICKUP_API_TOKEN, CLICKUP_WORKSPACE_ID)
-        
         self.setup_handlers()
 
     def load_data(self) -> Dict[str, Any]:
@@ -192,12 +213,24 @@ class SalaryBot:
             self.data[user_id] = {
                 "rate": 0,
                 "work_sessions": {},
-                "clickup_synced_entries": set()  # Для отслеживания уже синхронизированных записей
+                "clickup_synced_entries": set(),  # Для отслеживания уже синхронизированных записей
+                "clickup_settings": {
+                    "api_token": None,
+                    "workspace_id": None,
+                    "team_id": None
+                }
             }
         
         # Обновление структуры для старых пользователей
         if "clickup_synced_entries" not in self.data[user_id]:
             self.data[user_id]["clickup_synced_entries"] = set()
+        
+        if "clickup_settings" not in self.data[user_id]:
+            self.data[user_id]["clickup_settings"] = {
+                "api_token": None,
+                "workspace_id": None,
+                "team_id": None
+            }
             
         return self.data[user_id]
 
@@ -224,16 +257,43 @@ class SalaryBot:
         year = date.strftime('%Y')
         return f"{russian_month} {year}"
 
+    def get_user_clickup_client(self, user_id: str) -> Optional[ClickUpClient]:
+        """Получение ClickUp клиента для конкретного пользователя"""
+        user_data = self.get_user_data(user_id)
+        clickup_settings = user_data.get("clickup_settings", {})
+        
+        api_token = clickup_settings.get("api_token")
+        workspace_id = clickup_settings.get("workspace_id")
+        
+        if not api_token or not workspace_id:
+            return None
+            
+        return ClickUpClient(api_token, workspace_id)
+
+    async def validate_clickup_credentials(self, api_token: str, workspace_id: str) -> Dict[str, Any]:
+        """Валидация ClickUp credentials"""
+        try:
+            client = ClickUpClient(api_token, workspace_id)
+            team_id = await client.get_team_id()
+            
+            if team_id:
+                return {"success": True, "team_id": team_id}
+            else:
+                return {"success": False, "error": "Не удалось получить доступ к workspace"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     async def sync_clickup_entries(self, user_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """Синхронизация записей ClickUp с данными пользователя"""
-        if not self.clickup_client:
-            return {"success": False, "error": "ClickUp не настроен"}
+        clickup_client = self.get_user_clickup_client(user_id)
+        if not clickup_client:
+            return {"success": False, "error": "ClickUp не настроен для этого пользователя"}
         
         user_data = self.get_user_data(user_id)
         
         try:
             # Получаем записи из ClickUp
-            clickup_entries = await self.clickup_client.get_time_entries(start_date, end_date)
+            clickup_entries = await clickup_client.get_time_entries(start_date, end_date)
             
             if not clickup_entries:
                 return {"success": True, "synced_count": 0, "message": "Записи не найдены"}
@@ -326,17 +386,13 @@ class SalaryBot:
                 "/month - заработок за месяц\n"
                 "/monthweeks - заработок по неделям в месяце\n"
                 "/year - заработок по месяцам в году\n\n"
+                "🔗 ClickUp интеграция:\n"
+                "/clickup_setup - настроить интеграцию с ClickUp\n"
+                "/syncclickup - синхронизировать данные за сегодня\n"
+                "/synclast - синхронизировать за последние дни\n"
+                "/clickupstatus - статус интеграции\n\n"
+                "/help - показать полную справку\n\n"
             )
-            
-            if self.clickup_client:
-                welcome_text += (
-                    "🔗 ClickUp интеграция:\n"
-                    "/syncclickup - синхронизировать данные ClickUp за сегодня\n"
-                    "/synclast - синхронизировать за последние N дней\n"
-                    "/clickupstatus - статус интеграции ClickUp\n\n"
-                )
-            
-            welcome_text += "/help - показать полную справку\n\n"
 
             if user_data["rate"] > 0:
                 welcome_text += f"💰 Ваша текущая ставка: {user_data['rate']} руб/час"
@@ -360,20 +416,18 @@ class SalaryBot:
                 "/month - заработок за месяц\n"
                 "/monthweeks - заработок по неделям в месяце\n"
                 "/year - заработок по месяцам в году\n\n"
-            )
-            
-            if self.clickup_client:
-                help_text += (
-                    "🔗 ClickUp интеграция:\n"
-                    "/syncclickup - синхронизировать данные ClickUp за сегодня\n"
-                    "/synclast [дни] - синхронизировать за последние N дней (по умолчанию 7)\n"
-                    "/clickupstatus - статус интеграции и активные таймеры\n\n"
-                )
-            
-            help_text += (
+                "🔗 ClickUp интеграция:\n"
+                "/clickup_setup - пошаговая настройка ClickUp\n"
+                "/clickup_token - установить Personal API Token\n"
+                "/clickup_workspace - установить Workspace ID\n"
+                "/clickup_reset - сбросить настройки ClickUp\n"
+                "/syncclickup - синхронизировать данные за сегодня\n"
+                "/synclast [дни] - синхронизировать за последние N дней (по умолчанию 7)\n"
+                "/clickupstatus - статус интеграции и активные таймеры\n\n"
                 "💡 Для добавления времени используйте формат: ЧАСЫ МИНУТЫ\n"
                 "Например: 8 30 (означает 8 часов 30 минут)\n\n"
-                "🔄 ClickUp синхронизация автоматически объединяет данные из ClickUp с вашими ручными записями."
+                "🔄 ClickUp синхронизация автоматически объединяет данные из ClickUp с вашими ручными записями.\n"
+                "Каждый пользователь может настроить свои собственные ClickUp credentials."
             )
             await message.answer(help_text)
 
@@ -470,14 +524,117 @@ class SalaryBot:
             except ValueError:
                 await message.answer("❌ Пожалуйста, введите корректные числа!")
 
-        @self.dp.message(Command("syncclickup"))
-        async def sync_clickup_command(message: Message):
-            if not self.clickup_client:
-                await message.answer("❌ ClickUp интеграция не настроена")
+        @self.dp.message(Command("clickup_setup"))
+        async def clickup_setup_command(message: Message):
+            await message.answer(
+                "🔗 Настройка ClickUp интеграции\n\n"
+                "Для настройки интеграции с ClickUp вам понадобится:\n"
+                "1️⃣ Personal API Token\n"
+                "2️⃣ Workspace ID\n\n"
+                "📋 Пошаговая инструкция:\n"
+                "1. Откройте ClickUp в браузере\n"
+                "2. Нажмите на аватар → Settings → Apps\n"
+                "3. Нажмите 'Generate' для создания Personal API Token\n"
+                "4. Скопируйте токен и отправьте командой /clickup_token\n"
+                "5. Найдите Workspace ID в URL (цифры после /team/)\n"
+                "6. Отправьте Workspace ID командой /clickup_workspace\n\n"
+                "💡 После настройки используйте /clickupstatus для проверки"
+            )
+
+        @self.dp.message(Command("clickup_token"))
+        async def clickup_token_command(message: Message, state: FSMContext):
+            await message.answer("🔑 Отправьте ваш Personal API Token из ClickUp:\n\n"
+                                "Токен должен начинаться с 'pk_' и содержать цифры и буквы.\n"
+                                "Пример: pk_12345_ABCDEFGHIJK...")
+            await state.set_state(SalaryStates.waiting_for_clickup_token)
+
+        @self.dp.message(SalaryStates.waiting_for_clickup_token)
+        async def process_clickup_token(message: Message, state: FSMContext):
+            token = message.text.strip()
+            
+            # Валидация формата токена
+            if not token.startswith('pk_') or len(token) < 20:
+                await message.answer("❌ Неверный формат токена! Токен должен начинаться с 'pk_' и содержать не менее 20 символов.")
                 return
-                
+            
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
+            user_data["clickup_settings"]["api_token"] = token
+            self.save_data()
+            
+            await message.answer("✅ API Token сохранен!\n\n"
+                                "Теперь отправьте Workspace ID командой /clickup_workspace")
+            await state.clear()
+
+        @self.dp.message(Command("clickup_workspace"))
+        async def clickup_workspace_command(message: Message, state: FSMContext):
+            await message.answer("🏢 Отправьте ваш Workspace ID из ClickUp:\n\n"
+                                "Это числовой ID, который можно найти в URL ClickUp.\n"
+                                "Пример: 9015893221")
+            await state.set_state(SalaryStates.waiting_for_workspace_id)
+
+        @self.dp.message(SalaryStates.waiting_for_workspace_id)
+        async def process_workspace_id(message: Message, state: FSMContext):
+            workspace_id = message.text.strip()
+            
+            # Валидация workspace ID
+            if not workspace_id.isdigit() or len(workspace_id) < 8:
+                await message.answer("❌ Неверный формат Workspace ID! ID должен содержать только цифры и быть не менее 8 символов.")
+                return
+            
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            # Получаем API токен для валидации
+            api_token = user_data["clickup_settings"].get("api_token")
+            if not api_token:
+                await message.answer("❌ Сначала установите API токен командой /clickup_token")
+                return
+            
+            await message.answer("🔄 Проверяю подключение к ClickUp...")
+            
+            # Валидируем credentials
+            validation_result = await self.validate_clickup_credentials(api_token, workspace_id)
+            
+            if validation_result["success"]:
+                user_data["clickup_settings"]["workspace_id"] = workspace_id
+                user_data["clickup_settings"]["team_id"] = validation_result["team_id"]
+                self.save_data()
+                
+                await message.answer(f"✅ ClickUp интеграция настроена успешно!\n\n"
+                                    f"🏢 Team ID: {validation_result['team_id']}\n\n"
+                                    f"Теперь вы можете использовать:\n"
+                                    f"/syncclickup - синхронизация за сегодня\n"
+                                    f"/synclast - синхронизация за последние дни")
+            else:
+                await message.answer(f"❌ Ошибка подключения: {validation_result['error']}\n\n"
+                                    f"Проверьте правильность API токена и Workspace ID.")
+            
+            await state.clear()
+
+        @self.dp.message(Command("clickup_reset"))
+        async def clickup_reset_command(message: Message):
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            user_data["clickup_settings"] = {
+                "api_token": None,
+                "workspace_id": None,
+                "team_id": None
+            }
+            self.save_data()
+            
+            await message.answer("🗑 Настройки ClickUp сброшены.\n\n"
+                                "Для повторной настройки используйте /clickup_setup")
+
+        @self.dp.message(Command("syncclickup"))
+        async def sync_clickup_command(message: Message):
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if not self.get_user_clickup_client(user_id):
+                await message.answer("❌ ClickUp не настроен для вашего аккаунта\n\nИспользуйте /clickup_setup для настройки")
+                return
             
             if user_data["rate"] <= 0:
                 await message.answer("❌ Сначала установите ставку командой /setrate")
@@ -508,12 +665,12 @@ class SalaryBot:
 
         @self.dp.message(Command("synclast"))
         async def sync_last_command(message: Message):
-            if not self.clickup_client:
-                await message.answer("❌ ClickUp интеграция не настроена")
-                return
-                
             user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
+            
+            if not self.get_user_clickup_client(user_id):
+                await message.answer("❌ ClickUp не настроен для вашего аккаунта\n\nИспользуйте /clickup_setup для настройки")
+                return
             
             if user_data["rate"] <= 0:
                 await message.answer("❌ Сначала установите ставку командой /setrate")
@@ -558,20 +715,23 @@ class SalaryBot:
 
         @self.dp.message(Command("clickupstatus"))
         async def clickup_status_command(message: Message):
-            if not self.clickup_client:
-                await message.answer("❌ ClickUp интеграция не настроена\n\nДля настройки добавьте в .env файл:\nCLICKUP_API_TOKEN=ваш_токен\nCLICKUP_WORKSPACE_ID=id_рабочего_пространства")
+            user_id = str(message.from_user.id)
+            clickup_client = self.get_user_clickup_client(user_id)
+            
+            if not clickup_client:
+                await message.answer("❌ ClickUp не настроен для вашего аккаунта\n\nИспользуйте /clickup_setup для настройки")
                 return
             
             await message.answer("🔍 Проверяю статус ClickUp...")
             
             # Проверяем подключение
-            team_id = await self.clickup_client.get_team_id()
+            team_id = await clickup_client.get_team_id()
             if not team_id:
                 await message.answer("❌ Не удалось подключиться к ClickUp. Проверьте настройки API.")
                 return
             
             # Проверяем активные таймеры
-            current_timer = await self.clickup_client.get_current_timer()
+            current_timer = await clickup_client.get_current_timer()
             
             response = "✅ ClickUp интеграция активна\n\n"
             response += f"🏢 Team ID: {team_id}\n"
@@ -586,7 +746,6 @@ class SalaryBot:
             else:
                 response += "\n⏹ Активных таймеров нет"
             
-            user_id = str(message.from_user.id)
             user_data = self.get_user_data(user_id)
             synced_count = len(user_data.get("clickup_synced_entries", set()))
             response += f"\n\n📊 Синхронизировано записей: {synced_count}"
