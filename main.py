@@ -648,18 +648,50 @@ class SalaryBot:
         detail_reports = [
             ("earnings_week_details", "📊 Неделя детально" if current_report == "week_details" else "Неделя детально"),
             ("earnings_month_weeks", "📊 Месяц по неделям" if current_report == "month_weeks" else "Месяц по неделям"),
+            ("earnings_prev_month_weeks", "📊 Прошлый месяц" if current_report == "prev_month_weeks" else "Прошлый месяц"),
             ("earnings_year", "📊 Год" if current_report == "year" else "Год")
         ]
         
         for callback_data, text in detail_reports:
             row2.append(InlineKeyboardButton(text=text, callback_data=callback_data))
         
-        # Добавляем детальные отчеты в отдельном ряду
-        if len(row2) <= 2:
-            keyboard.append(row2)
-        else:
-            keyboard.append(row2[:2])
-            keyboard.append(row2[2:])
+        # Добавляем детальные отчеты в отдельных рядах по 2 кнопки
+        keyboard.append(row2[:2])
+        keyboard.append(row2[2:])
+        
+        return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+    def create_tasks_analytics_keyboard(self, current_report: str) -> InlineKeyboardMarkup:
+        """Создание клавиатуры для переключения между отчетами аналитики задач"""
+        keyboard = []
+        
+        # Первый ряд: основные периоды
+        row1 = []
+        reports = [
+            ("tasks_summary_today", "📊 Сегодня" if current_report == "today" else "Сегодня"),
+            ("tasks_summary_yesterday", "📊 Вчера" if current_report == "yesterday" else "Вчера"),
+            ("tasks_summary_week", "📊 Неделя" if current_report == "week" else "Неделя"),
+            ("tasks_summary_month", "📊 Месяц" if current_report == "month" else "Месяц")
+        ]
+        
+        for callback_data, text in reports:
+            row1.append(InlineKeyboardButton(text=text, callback_data=callback_data))
+        
+        # Разделяем на два ряда по 2 кнопки
+        keyboard.append(row1[:2])
+        keyboard.append(row1[2:])
+        
+        # Второй ряд: дополнительные периоды
+        row2 = []
+        additional_reports = [
+            ("tasks_summary_7days", "📊 7 дней" if current_report == "7days" else "7 дней"),
+            ("tasks_summary_30days", "📊 30 дней" if current_report == "30days" else "30 дней")
+        ]
+        
+        for callback_data, text in additional_reports:
+            row2.append(InlineKeyboardButton(text=text, callback_data=callback_data))
+        
+        keyboard.append(row2)
         
         return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
@@ -668,6 +700,39 @@ class SalaryBot:
         if show_navigation:
             keyboard = self.create_earnings_keyboard(report_type)
             await message.answer(content, reply_markup=keyboard)
+        else:
+            await message.answer(content)
+
+    async def send_tasks_analytics_report(self, message: Message, report_type: str, content: str, show_navigation: bool = True):
+        """Универсальная функция для отправки отчетов аналитики задач с inline кнопками"""
+        if show_navigation:
+            keyboard = self.create_tasks_analytics_keyboard(report_type)
+            
+            # Если сообщение слишком длинное, разбиваем на части
+            if len(content) > 4000:
+                # Отправляем по частям
+                parts = content.split('\n\n')
+                current_part = ""
+                
+                for part in parts:
+                    if len(current_part + part + '\n\n') > 4000:
+                        if current_part:
+                            await message.answer(current_part)
+                            current_part = part + '\n\n'
+                        else:
+                            # Если даже одна часть слишком длинная
+                            await message.answer(part)
+                    else:
+                        current_part += part + '\n\n'
+                
+                # Последняя часть с кнопками
+                if current_part:
+                    await message.answer(current_part, reply_markup=keyboard)
+                else:
+                    # Если нет последней части, добавляем кнопки к предыдущему сообщению
+                    await message.answer("📊 Навигация:", reply_markup=keyboard)
+            else:
+                await message.answer(content, reply_markup=keyboard)
         else:
             await message.answer(content)
 
@@ -730,29 +795,43 @@ class SalaryBot:
             return f"📊 На этой неделе (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}) нет записей о работе"
 
     def generate_month_report(self, user_data: Dict[str, Any]) -> str:
-        """Генерация отчета за месяц (30 дней)"""
+        """Генерация отчета за текущий календарный месяц"""
+        today = datetime.now()
+        first_day_of_month = today.replace(day=1)
+        
+        # Получаем последний день месяца
+        if today.month == 12:
+            last_day_of_month = today.replace(day=31)
+        else:
+            last_day_of_month = today.replace(day=1, month=today.month+1) - timedelta(days=1)
+        
         total_hours = 0
         total_earnings = 0
         days_worked = 0
         
-        for i in range(30):
-            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
-            if date in user_data["work_sessions"]:
-                session = user_data["work_sessions"][date]
+        # Проходим по всем дням календарного месяца до сегодняшнего дня
+        current_date = first_day_of_month
+        while current_date <= min(today, last_day_of_month):
+            date_str = current_date.strftime("%Y-%m-%d")
+            if date_str in user_data["work_sessions"]:
+                session = user_data["work_sessions"][date_str]
                 total_hours += session["total_hours"]
                 total_earnings += session["total_earnings"]
                 days_worked += 1
+            current_date += timedelta(days=1)
         
         if days_worked > 0:
+            month_name = today.strftime("%B %Y")
             return (
-                f"📊 Заработок за месяц:\n\n"
+                f"📊 Заработок за {month_name}:\n\n"
                 f"📅 Рабочих дней: {days_worked}\n"
                 f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
                 f"💰 Всего заработано: {total_earnings:.2f} руб\n"
                 f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
             )
         else:
-            return "📊 За последний месяц нет записей о работе"
+            month_name = today.strftime("%B %Y")
+            return f"📊 В {month_name} нет записей о работе"
 
     def generate_week_details_report(self, user_data: Dict[str, Any]) -> str:
         """Генерация детального отчета за неделю"""
@@ -870,6 +949,92 @@ class SalaryBot:
             ])
         else:
             response_lines = [f"📊 В {self.get_russian_month_year(today)} нет записей о работе"]
+        
+        return "\n".join(response_lines)
+
+    def generate_prev_month_weeks_report(self, user_data: Dict[str, Any]) -> str:
+        """Генерация отчета по неделям в предыдущем месяце"""
+        today = datetime.now()
+        
+        # Получаем первый день прошлого месяца
+        if today.month == 1:
+            prev_month_first = today.replace(year=today.year-1, month=12, day=1)
+        else:
+            prev_month_first = today.replace(month=today.month-1, day=1)
+        
+        # Получаем последний день прошлого месяца
+        if prev_month_first.month == 12:
+            prev_month_last = prev_month_first.replace(day=31)
+        else:
+            prev_month_last = prev_month_first.replace(day=1, month=prev_month_first.month+1) - timedelta(days=1)
+        
+        weeks_data = []
+        total_month_hours = 0
+        total_month_earnings = 0
+        week_number = 1
+        
+        current_start = prev_month_first
+        
+        while current_start <= prev_month_last:
+            if current_start == prev_month_first:
+                days_until_sunday = (6 - current_start.weekday()) % 7
+                week_end = current_start + timedelta(days=days_until_sunday)
+            else:
+                week_end = current_start + timedelta(days=6)
+            
+            week_end = min(week_end, prev_month_last)
+            
+            week_hours = 0
+            week_earnings = 0
+            
+            current_date = current_start
+            while current_date <= week_end:
+                date_str = current_date.strftime("%Y-%m-%d")
+                if date_str in user_data["work_sessions"]:
+                    session = user_data["work_sessions"][date_str]
+                    week_hours += session["total_hours"]
+                    week_earnings += session["total_earnings"]
+                current_date += timedelta(days=1)
+            
+            if week_hours > 0:
+                weeks_data.append({
+                    'number': week_number,
+                    'start': current_start,
+                    'end': week_end,
+                    'hours': week_hours,
+                    'earnings': week_earnings
+                })
+                total_month_hours += week_hours
+                total_month_earnings += week_earnings
+            
+            if current_start == prev_month_first:
+                days_until_sunday = (6 - current_start.weekday()) % 7
+                current_start = current_start + timedelta(days=days_until_sunday + 1)
+            else:
+                current_start += timedelta(days=7)
+            
+            week_number += 1
+        
+        if weeks_data:
+            prev_month_name = self.get_russian_month_year(prev_month_first)
+            response_lines = [f"📊 Заработок по неделям в {prev_month_name}:\n"]
+            
+            for week in weeks_data:
+                response_lines.append(
+                    f"📅 Неделя {week['number']} ({week['start'].strftime('%d.%m')} - {week['end'].strftime('%d.%m')}): "
+                    f"{self.format_hours_minutes(week['hours'])} = {week['earnings']:.2f} руб"
+                )
+            
+            response_lines.extend([
+                "",
+                f"📊 Итого за месяц:",
+                f"📅 Недель с работой: {len(weeks_data)}",
+                f"⏰ Всего отработано: {self.format_hours_minutes(total_month_hours)}",
+                f"💰 Всего заработано: {total_month_earnings:.2f} руб"
+            ])
+        else:
+            prev_month_name = self.get_russian_month_year(prev_month_first)
+            response_lines = [f"📊 В {prev_month_name} нет записей о работе"]
         
         return "\n".join(response_lines)
 
@@ -1616,6 +1781,49 @@ class SalaryBot:
         
         return "\n".join(response_lines)
 
+    def get_tasks_summary_by_period(self, period_type: str) -> tuple:
+        """Унифицированная функция для определения периода и получения дат"""
+        now = datetime.now()
+        
+        if period_type == "today":
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+            period_name = "сегодня"
+        elif period_type == "yesterday":
+            yesterday = now - timedelta(days=1)
+            start_date = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = yesterday.replace(hour=23, minute=59, second=59)
+            period_name = "вчера"
+        elif period_type == "week":
+            # Неделя с понедельника
+            monday = now - timedelta(days=now.weekday())
+            start_date = monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+            period_name = "неделю"
+        elif period_type == "month":
+            # Текущий месяц
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+            period_name = "месяц"
+        elif period_type == "7days":
+            # Последние 7 дней
+            start_date = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+            period_name = "последние 7 дней"
+        elif period_type == "30days":
+            # Последние 30 дней
+            start_date = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+            period_name = "последние 30 дней"
+        else:
+            # По умолчанию неделя
+            monday = now - timedelta(days=now.weekday())
+            start_date = monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+            period_name = "неделю"
+        
+        return start_date, end_date, period_name
+
     async def sync_clickup_entries(self, user_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """Синхронизация записей ClickUp с данными пользователя"""
         clickup_client = self.get_user_clickup_client(user_id)
@@ -2033,41 +2241,36 @@ class SalaryBot:
             period = "week"  # По умолчанию неделя
             
             if len(command_parts) > 1:
-                period = command_parts[1].lower()
+                period_arg = command_parts[1].lower()
+                # Если это число дней, обрабатываем особо
+                if period_arg.isdigit():
+                    days = int(period_arg)
+                    if days <= 0 or days > 365:
+                        await message.answer("❌ Количество дней должно быть от 1 до 365")
+                        return
+                    if days == 7:
+                        period = "7days"
+                    elif days == 30:
+                        period = "30days"
+                    else:
+                        # Для нестандартных периодов используем старую логику
+                        now = datetime.now()
+                        start_date = (now - timedelta(days=days-1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                        end_date = now
+                        period_name = f"последние {days} дней"
+                        
+                        await message.answer(f"📊 Анализирую задачи за {period_name}...")
+                        summary = self.get_tasks_summary(user_id, start_date, end_date)
+                        formatted_summary = self.format_task_summary(summary)
+                        await self.send_tasks_analytics_report(message, "custom", formatted_summary, show_navigation=False)
+                        return
+                else:
+                    period = period_arg
             
-            # Определяем временной период
-            now = datetime.now()
-            
-            if period == "today":
-                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                end_date = now
-                period_name = "сегодня"
-            elif period == "yesterday":
-                yesterday = now - timedelta(days=1)
-                start_date = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
-                end_date = yesterday.replace(hour=23, minute=59, second=59)
-                period_name = "вчера"
-            elif period == "week":
-                # Неделя с понедельника
-                monday = now - timedelta(days=now.weekday())
-                start_date = monday.replace(hour=0, minute=0, second=0, microsecond=0)
-                end_date = now
-                period_name = "неделю"
-            elif period == "month":
-                # Текущий месяц
-                start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                end_date = now
-                period_name = "месяц"
-            elif period.isdigit():
-                # Последние N дней
-                days = int(period)
-                if days <= 0 or days > 365:
-                    await message.answer("❌ Количество дней должно быть от 1 до 365")
-                    return
-                start_date = (now - timedelta(days=days-1)).replace(hour=0, minute=0, second=0, microsecond=0)
-                end_date = now
-                period_name = f"последние {days} дней"
-            else:
+            # Определяем период через унифицированную функцию
+            try:
+                start_date, end_date, period_name = self.get_tasks_summary_by_period(period)
+            except:
                 await message.answer("❌ Неверный период. Используйте: today, yesterday, week, month или число дней\n\n"
                                     "Примеры:\n"
                                     "/tasksummary - за неделю\n"
@@ -2081,30 +2284,9 @@ class SalaryBot:
             # Получаем сводку по задачам
             summary = self.get_tasks_summary(user_id, start_date, end_date)
             
-            # Форматируем и отправляем результат
+            # Форматируем и отправляем результат с кнопками навигации
             formatted_summary = self.format_task_summary(summary)
-            
-            # Если сообщение слишком длинное, разбиваем на части
-            if len(formatted_summary) > 4000:
-                # Отправляем по частям
-                parts = formatted_summary.split('\n\n')
-                current_part = ""
-                
-                for part in parts:
-                    if len(current_part + part + '\n\n') > 4000:
-                        if current_part:
-                            await message.answer(current_part)
-                            current_part = part + '\n\n'
-                        else:
-                            # Если даже одна часть слишком длинная
-                            await message.answer(part)
-                    else:
-                        current_part += part + '\n\n'
-                
-                if current_part:
-                    await message.answer(current_part)
-            else:
-                await message.answer(formatted_summary)
+            await self.send_tasks_analytics_report(message, period, formatted_summary)
 
         @self.dp.message(Command("syncclickup"))
         async def sync_clickup_command(message: Message):
@@ -2287,6 +2469,13 @@ class SalaryBot:
             user_data = self.get_user_data(user_id)
             content = self.generate_month_weeks_report(user_data)
             await self.send_earnings_report(message, "month_weeks", content)
+
+        @self.dp.message(Command("prevmonthweeks"))
+        async def prev_month_weeks_command(message: Message):
+            user_id = str(message.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_prev_month_weeks_report(user_data)
+            await self.send_earnings_report(message, "prev_month_weeks", content)
 
         @self.dp.message(Command("year"))
         async def year_command(message: Message):
@@ -3055,6 +3244,16 @@ class SalaryBot:
             await callback.message.edit_text(content, reply_markup=keyboard)
             await callback.answer()
 
+        @self.dp.callback_query(F.data == "earnings_prev_month_weeks")
+        async def handle_earnings_prev_month_weeks(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            content = self.generate_prev_month_weeks_report(user_data)
+            
+            keyboard = self.create_earnings_keyboard("prev_month_weeks")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
         @self.dp.callback_query(F.data == "earnings_year")
         async def handle_earnings_year(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
@@ -3062,6 +3261,109 @@ class SalaryBot:
             content = self.generate_year_report(user_data)
             
             keyboard = self.create_earnings_keyboard("year")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        # Callback обработчики для аналитики задач
+        @self.dp.callback_query(F.data == "tasks_summary_today")
+        async def handle_tasks_summary_today(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if user_data["rate"] <= 0:
+                await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
+                return
+            
+            start_date, end_date, period_name = self.get_tasks_summary_by_period("today")
+            summary = self.get_tasks_summary(user_id, start_date, end_date)
+            content = self.format_task_summary(summary)
+            
+            keyboard = self.create_tasks_analytics_keyboard("today")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "tasks_summary_yesterday")
+        async def handle_tasks_summary_yesterday(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if user_data["rate"] <= 0:
+                await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
+                return
+            
+            start_date, end_date, period_name = self.get_tasks_summary_by_period("yesterday")
+            summary = self.get_tasks_summary(user_id, start_date, end_date)
+            content = self.format_task_summary(summary)
+            
+            keyboard = self.create_tasks_analytics_keyboard("yesterday")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "tasks_summary_week")
+        async def handle_tasks_summary_week(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if user_data["rate"] <= 0:
+                await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
+                return
+            
+            start_date, end_date, period_name = self.get_tasks_summary_by_period("week")
+            summary = self.get_tasks_summary(user_id, start_date, end_date)
+            content = self.format_task_summary(summary)
+            
+            keyboard = self.create_tasks_analytics_keyboard("week")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "tasks_summary_month")
+        async def handle_tasks_summary_month(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if user_data["rate"] <= 0:
+                await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
+                return
+            
+            start_date, end_date, period_name = self.get_tasks_summary_by_period("month")
+            summary = self.get_tasks_summary(user_id, start_date, end_date)
+            content = self.format_task_summary(summary)
+            
+            keyboard = self.create_tasks_analytics_keyboard("month")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "tasks_summary_7days")
+        async def handle_tasks_summary_7days(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if user_data["rate"] <= 0:
+                await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
+                return
+            
+            start_date, end_date, period_name = self.get_tasks_summary_by_period("7days")
+            summary = self.get_tasks_summary(user_id, start_date, end_date)
+            content = self.format_task_summary(summary)
+            
+            keyboard = self.create_tasks_analytics_keyboard("7days")
+            await callback.message.edit_text(content, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "tasks_summary_30days")
+        async def handle_tasks_summary_30days(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            user_data = self.get_user_data(user_id)
+            
+            if user_data["rate"] <= 0:
+                await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
+                return
+            
+            start_date, end_date, period_name = self.get_tasks_summary_by_period("30days")
+            summary = self.get_tasks_summary(user_id, start_date, end_date)
+            content = self.format_task_summary(summary)
+            
+            keyboard = self.create_tasks_analytics_keyboard("30days")
             await callback.message.edit_text(content, reply_markup=keyboard)
             await callback.answer()
 
