@@ -3,8 +3,12 @@ import logging
 import os
 from datetime import datetime
 
+from dotenv import load_dotenv
+
 import crypto
 import db
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
