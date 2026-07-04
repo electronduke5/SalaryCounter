@@ -12,6 +12,10 @@
 import asyncio
 from datetime import datetime, timedelta
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from data_manager import DataManager
 
 CHUNK_DAYS = 30
