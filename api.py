@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import migrate_to_sqlite
 from data_manager import DataManager
 
 load_dotenv()
@@ -29,6 +30,7 @@ INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+migrate_to_sqlite.migrate()
 data_manager = DataManager()
 
 
@@ -162,10 +164,10 @@ api = FastAPI()
 
 @api.get("/user/profile")
 async def get_user_profile(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
-    clickup = user_data.get("clickup_settings", {})
+    rate = data_manager.get_rate(user_id)
+    clickup = data_manager.get_clickup_settings(user_id)
     return {
-        "rate": user_data.get("rate", 0),
+        "rate": rate,
         "clickup_configured": bool(clickup.get("api_token") and clickup.get("workspace_id")),
         "clickup_username": clickup.get("username"),
         "clickup_user_id": clickup.get("user_id"),
@@ -174,27 +176,24 @@ async def get_user_profile(user_id: str = Depends(get_current_user)):
 
 @api.get("/user/rate")
 async def get_rate(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
-    return {"rate": user_data.get("rate", 0)}
+    return {"rate": data_manager.get_rate(user_id)}
 
 
 @api.put("/user/rate")
 async def update_rate(body: RateUpdate, user_id: str = Depends(get_current_user)):
     if body.rate <= 0:
         raise HTTPException(status_code=400, detail="Rate must be positive")
-    user_data = data_manager.get_user_data(user_id)
-    user_data["rate"] = body.rate
-    data_manager.save_data()
+    data_manager.set_rate(user_id, body.rate)
     return {"rate": body.rate}
 
 
-def _sum_sessions(user_data: dict, start_date: datetime, end_date: datetime) -> dict:
+def _sum_sessions(work_sessions: dict, start_date: datetime, end_date: datetime) -> dict:
     """Суммирует часы и заработок по дневным сессиям в диапазоне [start_date, end_date] включительно."""
     start = start_date.date()
     end = end_date.date()
     total_hours = 0.0
     total_earnings = 0.0
-    for date_str, session in user_data["work_sessions"].items():
+    for date_str, session in work_sessions.items():
         try:
             d = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
@@ -205,13 +204,13 @@ def _sum_sessions(user_data: dict, start_date: datetime, end_date: datetime) -> 
     return {"total_hours": total_hours, "total_earnings": total_earnings}
 
 
-def _daily_series(user_data: dict, start_date: datetime, end_date: datetime) -> list:
+def _daily_series(work_sessions: dict, start_date: datetime, end_date: datetime) -> list:
     """Разбивка по дням в диапазоне [start_date, end_date] включительно (без пропусков)."""
     out = []
     cur = start_date
     while cur.date() <= end_date.date():
         ds = cur.strftime("%Y-%m-%d")
-        session = user_data["work_sessions"].get(ds, {})
+        session = work_sessions.get(ds, {})
         out.append({
             "date": ds,
             "total_hours": session.get("total_hours", 0),
@@ -221,10 +220,10 @@ def _daily_series(user_data: dict, start_date: datetime, end_date: datetime) -> 
     return out
 
 
-def _monthly_series(user_data: dict, year: int) -> list:
+def _monthly_series(work_sessions: dict, year: int) -> list:
     """Разбивка по 12 месяцам указанного года."""
     totals = {m: {"total_hours": 0, "total_earnings": 0} for m in range(1, 13)}
-    for date_str, session in user_data["work_sessions"].items():
+    for date_str, session in work_sessions.items():
         try:
             d = datetime.strptime(date_str, "%Y-%m-%d")
         except ValueError:
@@ -238,9 +237,9 @@ def _monthly_series(user_data: dict, year: int) -> list:
     ]
 
 
-def _previous(user_data: dict, start_date: datetime, end_date: datetime, label: str, series: Optional[list] = None) -> dict:
+def _previous(work_sessions: dict, start_date: datetime, end_date: datetime, label: str, series: Optional[list] = None) -> dict:
     """Итоги предыдущего эквивалентного периода для сравнения (+ опциональная разбивка)."""
-    totals = _sum_sessions(user_data, start_date, end_date)
+    totals = _sum_sessions(work_sessions, start_date, end_date)
     result = {**totals, "label": label}
     if series is not None:
         result["series"] = series
@@ -249,46 +248,46 @@ def _previous(user_data: dict, start_date: datetime, end_date: datetime, label: 
 
 @api.get("/earnings/today")
 async def earnings_today(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
+    work_sessions = data_manager.get_work_sessions(user_id)
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
-    session = user_data["work_sessions"].get(today, {})
+    session = work_sessions.get(today, {})
     prev_day = now - timedelta(days=1)
     return {
         "date": today,
         "total_hours": session.get("total_hours", 0),
         "total_earnings": session.get("total_earnings", 0),
         "sessions": session.get("sessions", []),
-        "previous": _previous(user_data, prev_day, prev_day, "вчера"),
+        "previous": _previous(work_sessions, prev_day, prev_day, "вчера"),
     }
 
 
 @api.get("/earnings/yesterday")
 async def earnings_yesterday(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
+    work_sessions = data_manager.get_work_sessions(user_id)
     yesterday_dt = datetime.now() - timedelta(days=1)
     yesterday = yesterday_dt.strftime("%Y-%m-%d")
-    session = user_data["work_sessions"].get(yesterday, {})
+    session = work_sessions.get(yesterday, {})
     day_before = yesterday_dt - timedelta(days=1)
     return {
         "date": yesterday,
         "total_hours": session.get("total_hours", 0),
         "total_earnings": session.get("total_earnings", 0),
         "sessions": session.get("sessions", []),
-        "previous": _previous(user_data, day_before, day_before, "позавчера"),
+        "previous": _previous(work_sessions, day_before, day_before, "позавчера"),
     }
 
 
 @api.get("/earnings/week")
 async def earnings_week(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
+    work_sessions = data_manager.get_work_sessions(user_id)
     today = datetime.now()
     monday = today - timedelta(days=today.weekday())
     days = []
     current = monday
     while current <= today:
         date_str = current.strftime("%Y-%m-%d")
-        session = user_data["work_sessions"].get(date_str, {})
+        session = work_sessions.get(date_str, {})
         days.append({
             "date": date_str,
             "total_hours": session.get("total_hours", 0),
@@ -305,32 +304,32 @@ async def earnings_week(user_id: str = Depends(get_current_user)):
         "total_hours": total_hours,
         "total_earnings": total_earnings,
         "previous": _previous(
-            user_data,
+            work_sessions,
             monday - timedelta(days=7),
             monday - timedelta(days=1),
             "прошлая неделя",
-            series=_daily_series(user_data, monday - timedelta(days=7), monday - timedelta(days=1)),
+            series=_daily_series(work_sessions, monday - timedelta(days=7), monday - timedelta(days=1)),
         ),
     }
 
 
 @api.get("/earnings/week-details")
 async def earnings_week_details(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
-    report = data_manager.generate_week_details_report(user_data)
+    work_sessions = data_manager.get_work_sessions(user_id)
+    report = data_manager.generate_week_details_report(work_sessions)
     return {"report": report}
 
 
 @api.get("/earnings/month")
 async def earnings_month(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
+    work_sessions = data_manager.get_work_sessions(user_id)
     today = datetime.now()
     first = today.replace(day=1)
     days = []
     current = first
     while current <= today:
         date_str = current.strftime("%Y-%m-%d")
-        session = user_data["work_sessions"].get(date_str, {})
+        session = work_sessions.get(date_str, {})
         days.append({
             "date": date_str,
             "total_hours": session.get("total_hours", 0),
@@ -348,36 +347,36 @@ async def earnings_month(user_id: str = Depends(get_current_user)):
         "total_hours": total_hours,
         "total_earnings": total_earnings,
         "previous": _previous(
-            user_data,
+            work_sessions,
             prev_month_first,
             prev_month_last,
             "прошлый месяц",
-            series=_daily_series(user_data, prev_month_first, prev_month_last),
+            series=_daily_series(work_sessions, prev_month_first, prev_month_last),
         ),
     }
 
 
 @api.get("/earnings/month-weeks")
 async def earnings_month_weeks(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
-    report = data_manager.generate_month_weeks_report(user_data)
+    work_sessions = data_manager.get_work_sessions(user_id)
+    report = data_manager.generate_month_weeks_report(work_sessions)
     return {"report": report}
 
 
 @api.get("/earnings/prev-month-weeks")
 async def earnings_prev_month_weeks(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
-    report = data_manager.generate_prev_month_weeks_report(user_data)
+    work_sessions = data_manager.get_work_sessions(user_id)
+    report = data_manager.generate_prev_month_weeks_report(work_sessions)
     return {"report": report}
 
 
 @api.get("/earnings/year")
 async def earnings_year(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
+    work_sessions = data_manager.get_work_sessions(user_id)
     now = datetime.now()
     current_year = now.year
     months = {}
-    for date_str, session in user_data["work_sessions"].items():
+    for date_str, session in work_sessions.items():
         try:
             d = datetime.strptime(date_str, "%Y-%m-%d")
             if d.year != current_year:
@@ -400,11 +399,11 @@ async def earnings_year(user_id: str = Depends(get_current_user)):
         "total_hours": total_hours,
         "total_earnings": total_earnings,
         "previous": _previous(
-            user_data,
+            work_sessions,
             prev_start,
             prev_end,
             "прошлый год",
-            series=_monthly_series(user_data, current_year - 1),
+            series=_monthly_series(work_sessions, current_year - 1),
         ),
     }
 
@@ -412,8 +411,7 @@ async def earnings_year(user_id: str = Depends(get_current_user)):
 @api.get("/clickup/status")
 async def clickup_status(user_id: str = Depends(get_current_user)):
     client = data_manager.get_user_clickup_client(user_id)
-    user_data = data_manager.get_user_data(user_id)
-    clickup_settings = user_data.get("clickup_settings", {})
+    clickup_settings = data_manager.get_clickup_settings(user_id)
 
     if not client:
         return {
@@ -449,7 +447,9 @@ async def clickup_status(user_id: str = Depends(get_current_user)):
         "username": clickup_settings.get("username"),
         "workspace_id": clickup_settings.get("workspace_id"),
         "active_timer": active_timer,
-        "synced_count": len(user_data.get("clickup_synced_entries", set())),
+        "synced_count": data_manager.conn.execute(
+            "SELECT COUNT(*) FROM synced_entries WHERE user_id = ?", (user_id,)
+        ).fetchone()[0],
         "user_id_set": bool(clickup_settings.get("user_id")),
     }
 
@@ -460,13 +460,14 @@ async def clickup_setup(body: ClickUpSetupRequest, user_id: str = Depends(get_cu
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
 
-    user_data = data_manager.get_user_data(user_id)
-    user_data["clickup_settings"]["api_token"] = body.api_token
-    user_data["clickup_settings"]["workspace_id"] = body.workspace_id
-    user_data["clickup_settings"]["team_id"] = result["team_id"]
-    user_data["clickup_settings"]["user_id"] = result["user_id"]
-    user_data["clickup_settings"]["username"] = result["username"]
-    data_manager.save_data()
+    data_manager.set_clickup_settings(
+        user_id,
+        api_token=body.api_token,
+        workspace_id=body.workspace_id,
+        team_id=result["team_id"],
+        user_id=result["user_id"],
+        username=result["username"],
+    )
 
     return {
         "success": True,
@@ -477,22 +478,13 @@ async def clickup_setup(body: ClickUpSetupRequest, user_id: str = Depends(get_cu
 
 @api.delete("/clickup/setup")
 async def clickup_reset(user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
-    user_data["clickup_settings"] = {
-        "api_token": None,
-        "workspace_id": None,
-        "team_id": None,
-        "user_id": None,
-        "username": None,
-    }
-    data_manager.save_data()
+    data_manager.clear_clickup_settings(user_id)
     return {"success": True}
 
 
 @api.post("/clickup/sync")
 async def clickup_sync(body: SyncRequest, user_id: str = Depends(get_current_user)):
-    user_data = data_manager.get_user_data(user_id)
-    if user_data.get("rate", 0) <= 0:
+    if data_manager.get_rate(user_id) <= 0:
         raise HTTPException(status_code=400, detail="Rate not set")
 
     end_date = datetime.now()
@@ -539,8 +531,7 @@ async def get_list_tasks(list_id: str, status: str = "all", user_id: str = Depen
     if not client:
         raise HTTPException(status_code=400, detail="ClickUp not configured")
 
-    user_data = data_manager.get_user_data(user_id)
-    assignee_id = user_data.get("clickup_settings", {}).get("user_id")
+    assignee_id = data_manager.get_clickup_settings(user_id).get("user_id")
 
     tasks = await client.get_tasks(list_id, assignee_id)
 
