@@ -197,12 +197,12 @@ class DataManager:
         year = date.strftime('%Y')
         return f"{russian_month} {year}"
 
-    def generate_today_report(self, user_data: Dict[str, Any]) -> str:
+    def generate_today_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация отчета за сегодня"""
         today = datetime.now().strftime("%Y-%m-%d")
 
-        if today in user_data["work_sessions"]:
-            session = user_data["work_sessions"][today]
+        if today in work_sessions:
+            session = work_sessions[today]
             return (
                 f"📊 Заработок за сегодня ({datetime.now().strftime('%d.%m.%Y')}):\n\n"
                 f"⏰ Отработано: {self.format_hours_minutes(session['total_hours'])}\n"
@@ -211,12 +211,12 @@ class DataManager:
         else:
             return "📊 Сегодня вы еще не добавляли рабочее время"
 
-    def generate_yesterday_report(self, user_data: Dict[str, Any]) -> str:
+    def generate_yesterday_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация отчета за вчера"""
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        if yesterday in user_data["work_sessions"]:
-            session = user_data["work_sessions"][yesterday]
+        if yesterday in work_sessions:
+            session = work_sessions[yesterday]
             return (
                 f"📊 Заработок за вчера ({(datetime.now() - timedelta(days=1)).strftime('%d.%m.%Y')}):\n\n"
                 f"⏰ Отработано: {self.format_hours_minutes(session['total_hours'])}\n"
@@ -225,7 +225,7 @@ class DataManager:
         else:
             return "📊 Вчера вы не добавляли рабочее время"
 
-    def generate_week_report(self, user_data: Dict[str, Any]) -> str:
+    def generate_week_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация отчета за неделю"""
         today = datetime.now()
         monday = today - timedelta(days=today.weekday())
@@ -237,8 +237,8 @@ class DataManager:
         current_date = monday
         while current_date <= today:
             date_str = current_date.strftime("%Y-%m-%d")
-            if date_str in user_data["work_sessions"]:
-                session = user_data["work_sessions"][date_str]
+            if date_str in work_sessions:
+                session = work_sessions[date_str]
                 total_hours += session["total_hours"]
                 total_earnings += session["total_earnings"]
                 days_worked += 1
@@ -255,7 +255,7 @@ class DataManager:
         else:
             return f"📊 На этой неделе (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}) нет записей о работе"
 
-    def generate_month_report(self, user_data: Dict[str, Any]) -> str:
+    def generate_month_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация отчета за текущий календарный месяц"""
         today = datetime.now()
         first_day_of_month = today.replace(day=1)
@@ -272,8 +272,8 @@ class DataManager:
         current_date = first_day_of_month
         while current_date <= min(today, last_day_of_month):
             date_str = current_date.strftime("%Y-%m-%d")
-            if date_str in user_data["work_sessions"]:
-                session = user_data["work_sessions"][date_str]
+            if date_str in work_sessions:
+                session = work_sessions[date_str]
                 total_hours += session["total_hours"]
                 total_earnings += session["total_earnings"]
                 days_worked += 1
@@ -292,7 +292,7 @@ class DataManager:
             month_name = today.strftime("%B %Y")
             return f"📊 В {month_name} нет записей о работе"
 
-    def generate_week_details_report(self, user_data: Dict[str, Any]) -> str:
+    def generate_week_details_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация детального отчета за неделю"""
         today = datetime.now()
         monday = today - timedelta(days=today.weekday())
@@ -308,8 +308,8 @@ class DataManager:
             date_str = current_date.strftime("%Y-%m-%d")
             day_name = days_names[day_index]
 
-            if date_str in user_data["work_sessions"]:
-                session = user_data["work_sessions"][date_str]
+            if date_str in work_sessions:
+                session = work_sessions[date_str]
                 hours = session["total_hours"]
                 earnings = session["total_earnings"]
                 total_hours += hours
@@ -333,7 +333,7 @@ class DataManager:
 
         return "\n".join(response_lines)
 
-    def generate_month_weeks_report(self, user_data: Dict[str, Any]) -> str:
+    def generate_month_weeks_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация отчета по неделям в текущем месяце"""
         today = datetime.now()
         first_day_of_month = today.replace(day=1)
@@ -365,8 +365,8 @@ class DataManager:
             current_date = current_start
             while current_date <= week_end:
                 date_str = current_date.strftime("%Y-%m-%d")
-                if date_str in user_data["work_sessions"]:
-                    session = user_data["work_sessions"][date_str]
+                if date_str in work_sessions:
+                    session = work_sessions[date_str]
                     week_hours += session["total_hours"]
                     week_earnings += session["total_earnings"]
                 current_date += timedelta(days=1)
@@ -411,7 +411,7 @@ class DataManager:
 
         return "\n".join(response_lines)
 
-    def generate_prev_month_weeks_report(self, user_data: Dict[str, Any]) -> str:
+    def generate_prev_month_weeks_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация отчета по неделям в предыдущем месяце"""
         today = datetime.now()
 
@@ -447,8 +447,8 @@ class DataManager:
             current_date = current_start
             while current_date <= week_end:
                 date_str = current_date.strftime("%Y-%m-%d")
-                if date_str in user_data["work_sessions"]:
-                    session = user_data["work_sessions"][date_str]
+                if date_str in work_sessions:
+                    session = work_sessions[date_str]
                     week_hours += session["total_hours"]
                     week_earnings += session["total_earnings"]
                 current_date += timedelta(days=1)
@@ -495,7 +495,7 @@ class DataManager:
 
         return "\n".join(response_lines)
 
-    def generate_year_report(self, user_data: Dict[str, Any]) -> str:
+    def generate_year_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация отчета за год по месяцам"""
         current_year = datetime.now().year
 
@@ -503,7 +503,7 @@ class DataManager:
         total_year_hours = 0
         total_year_earnings = 0
 
-        for date_str, session in user_data["work_sessions"].items():
+        for date_str, session in work_sessions.items():
             try:
                 session_date = datetime.strptime(date_str, "%Y-%m-%d")
 
@@ -602,7 +602,7 @@ class DataManager:
                 }
 
             task_data = tasks[task_name]
-            session_hours = session.get("hours", 0) + session.get("minutes", 0) / 60
+            session_hours = session.get("duration_ms", 0) / 3_600_000
             session_earnings = session.get("earnings", 0)
             session_timestamp = session.get("timestamp")
 
@@ -621,15 +621,15 @@ class DataManager:
 
     def get_tasks_summary(self, user_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """Получение сводки по задачам за указанный период"""
-        user_data = self.get_user_data(user_id)
+        work_sessions = self.get_work_sessions(user_id)
 
         all_sessions = []
         current_date = start_date
 
         while current_date <= end_date:
             date_str = current_date.strftime("%Y-%m-%d")
-            if date_str in user_data["work_sessions"]:
-                day_sessions = user_data["work_sessions"][date_str]["sessions"]
+            if date_str in work_sessions:
+                day_sessions = work_sessions[date_str]["sessions"]
                 for session in day_sessions:
                     session["date"] = date_str
                     all_sessions.append(session)
@@ -664,7 +664,7 @@ class DataManager:
 
     def get_days_breakdown(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Разбивка по дням за период (для аналитики в вебапп)"""
-        user_data = self.get_user_data(user_id)
+        work_sessions = self.get_work_sessions(user_id)
         weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
         days = []
@@ -673,8 +673,8 @@ class DataManager:
             date_str = current.strftime("%Y-%m-%d")
             hours = 0
             earnings = 0
-            if date_str in user_data["work_sessions"]:
-                session = user_data["work_sessions"][date_str]
+            if date_str in work_sessions:
+                session = work_sessions[date_str]
                 hours = session.get("total_hours", 0)
                 earnings = session.get("total_earnings", 0)
 
@@ -691,7 +691,7 @@ class DataManager:
 
     def get_weeks_breakdown(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Разбивка по календарным неделям за период (для аналитики в вебапп)"""
-        user_data = self.get_user_data(user_id)
+        work_sessions = self.get_work_sessions(user_id)
 
         weeks = []
         number = 1
@@ -708,8 +708,8 @@ class DataManager:
             day = current_start
             while day.date() <= week_end.date():
                 date_str = day.strftime("%Y-%m-%d")
-                if date_str in user_data["work_sessions"]:
-                    session = user_data["work_sessions"][date_str]
+                if date_str in work_sessions:
+                    session = work_sessions[date_str]
                     week_hours += session.get("total_hours", 0)
                     week_earnings += session.get("total_earnings", 0)
                 day += timedelta(days=1)
@@ -729,7 +729,7 @@ class DataManager:
 
     def get_months_breakdown(self, user_id: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Разбивка по календарным месяцам за период (для аналитики в вебапп)"""
-        user_data = self.get_user_data(user_id)
+        work_sessions = self.get_work_sessions(user_id)
         month_names = [
             "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
             "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
@@ -746,7 +746,7 @@ class DataManager:
 
             month_hours = 0
             month_earnings = 0
-            for date_str, session in user_data["work_sessions"].items():
+            for date_str, session in work_sessions.items():
                 try:
                     day = datetime.strptime(date_str, "%Y-%m-%d")
                 except ValueError:
