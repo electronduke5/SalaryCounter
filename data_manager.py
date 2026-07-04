@@ -1,4 +1,5 @@
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
@@ -20,24 +21,28 @@ class DataManager:
     def __init__(self, db_path: str = DB_FILE):
         self.db_path = db_path
         self.conn = db.get_connection(db_path)
+        self._lock = threading.Lock()
 
     def ensure_user(self, user_id: str) -> None:
-        self.conn.execute(
-            "INSERT OR IGNORE INTO users (user_id, rate) VALUES (?, 0)", (user_id,)
-        )
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO users (user_id, rate) VALUES (?, 0)", (user_id,)
+            )
 
     def get_rate(self, user_id: str) -> float:
-        row = self.conn.execute(
-            "SELECT rate FROM users WHERE user_id = ?", (user_id,)
-        ).fetchone()
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT rate FROM users WHERE user_id = ?", (user_id,)
+            ).fetchone()
         return row["rate"] if row else 0.0
 
     def get_clickup_settings(self, user_id: str) -> Dict[str, Any]:
-        row = self.conn.execute(
-            "SELECT clickup_api_token, clickup_workspace_id, clickup_team_id, "
-            "clickup_user_id, clickup_username FROM users WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT clickup_api_token, clickup_workspace_id, clickup_team_id, "
+                "clickup_user_id, clickup_username FROM users WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
         if not row:
             return {k: None for k in _CLICKUP_KEYS}
         token = row["clickup_api_token"]
@@ -50,41 +55,43 @@ class DataManager:
         }
 
     def get_work_sessions(self, user_id: str) -> Dict[str, Any]:
-        cur = self.conn.execute(
-            "SELECT date, duration_ms, earnings, timestamp, source, clickup_id, "
-            "task_name, project_name, description FROM work_sessions "
-            "WHERE user_id = ? ORDER BY id",
-            (user_id,),
-        )
-        result: Dict[str, Any] = {}
-        for row in cur:
-            day = result.setdefault(
-                row["date"], {"total_hours": 0.0, "total_earnings": 0.0, "sessions": []}
+        with self._lock:
+            cur = self.conn.execute(
+                "SELECT date, duration_ms, earnings, timestamp, source, clickup_id, "
+                "task_name, project_name, description FROM work_sessions "
+                "WHERE user_id = ? ORDER BY id",
+                (user_id,),
             )
-            ms = row["duration_ms"]
-            duration_hours = ms / MS_PER_HOUR
-            day["sessions"].append({
-                "duration_ms": ms,
-                "duration_hours": duration_hours,
-                "hours": ms // MS_PER_HOUR,
-                "minutes": (ms % MS_PER_HOUR) // 60_000,
-                "earnings": row["earnings"],
-                "timestamp": row["timestamp"],
-                "source": row["source"],
-                "clickup_id": row["clickup_id"],
-                "task_name": row["task_name"],
-                "project_name": row["project_name"],
-                "description": row["description"],
-            })
-            day["total_hours"] += duration_hours
-            day["total_earnings"] += row["earnings"]
+            result: Dict[str, Any] = {}
+            for row in cur:
+                day = result.setdefault(
+                    row["date"], {"total_hours": 0.0, "total_earnings": 0.0, "sessions": []}
+                )
+                ms = row["duration_ms"]
+                duration_hours = ms / MS_PER_HOUR
+                day["sessions"].append({
+                    "duration_ms": ms,
+                    "duration_hours": duration_hours,
+                    "hours": ms // MS_PER_HOUR,
+                    "minutes": (ms % MS_PER_HOUR) // 60_000,
+                    "earnings": row["earnings"],
+                    "timestamp": row["timestamp"],
+                    "source": row["source"],
+                    "clickup_id": row["clickup_id"],
+                    "task_name": row["task_name"],
+                    "project_name": row["project_name"],
+                    "description": row["description"],
+                })
+                day["total_hours"] += duration_hours
+                day["total_earnings"] += row["earnings"]
         return result
 
     def is_entry_synced(self, user_id: str, entry_id: str) -> bool:
-        row = self.conn.execute(
-            "SELECT 1 FROM synced_entries WHERE user_id = ? AND entry_id = ?",
-            (user_id, entry_id),
-        ).fetchone()
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT 1 FROM synced_entries WHERE user_id = ? AND entry_id = ?",
+                (user_id, entry_id),
+            ).fetchone()
         return row is not None
 
     def format_hours_minutes(self, total_hours: float) -> str:
