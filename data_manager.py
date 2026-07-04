@@ -914,7 +914,7 @@ class DataManager:
         if not clickup_client:
             return {"success": False, "error": "ClickUp не настроен для этого пользователя"}
 
-        user_data = self.get_user_data(user_id)
+        rate = self.get_rate(user_id)
         list_name_cache: Dict[str, str] = {}
 
         try:
@@ -934,55 +934,40 @@ class DataManager:
                 if duration_ms < 0:
                     continue
 
-                if entry_id in user_data["clickup_synced_entries"]:
-                    continue
-
                 duration_hours = duration_ms / (1000 * 60 * 60)
-                earnings = duration_hours * user_data["rate"]
+                earnings = duration_hours * rate
 
                 start_timestamp = int(entry.get('start', 0)) / 1000
                 entry_date = datetime.fromtimestamp(start_timestamp).strftime("%Y-%m-%d")
-
-                if entry_date not in user_data["work_sessions"]:
-                    user_data["work_sessions"][entry_date] = {
-                        "total_hours": 0,
-                        "total_earnings": 0,
-                        "sessions": []
-                    }
 
                 project_name = await self._resolve_list_name(
                     clickup_client, self._entry_list_id(entry), list_name_cache
                 )
 
                 clickup_session = {
-                    "hours": int(duration_hours),
-                    "minutes": int((duration_hours % 1) * 60),
+                    "duration_ms": duration_ms,
                     "earnings": earnings,
                     "timestamp": datetime.fromtimestamp(start_timestamp).isoformat(),
                     "source": "clickup",
                     "clickup_id": entry_id,
                     "task_name": entry.get('task', {}).get('name', 'Неизвестная задача') if entry.get('task') else 'Без задачи',
                     "project_name": project_name,
-                    "description": entry.get('description', '')
+                    "description": entry.get('description', ''),
                 }
 
-                user_data["work_sessions"][entry_date]["sessions"].append(clickup_session)
-                user_data["work_sessions"][entry_date]["total_hours"] += duration_hours
-                user_data["work_sessions"][entry_date]["total_earnings"] += earnings
-
-                user_data["clickup_synced_entries"].add(entry_id)
+                # Атомарно: дедуп + вставка сессии одной транзакцией
+                if not self.add_synced_session(user_id, entry_id, entry_date, clickup_session):
+                    continue
 
                 synced_count += 1
                 total_hours += duration_hours
                 total_earnings += earnings
 
-            self.save_data()
-
             return {
                 "success": True,
                 "synced_count": synced_count,
                 "total_hours": total_hours,
-                "total_earnings": total_earnings
+                "total_earnings": total_earnings,
             }
 
         except Exception as e:
