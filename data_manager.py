@@ -94,6 +94,86 @@ class DataManager:
             ).fetchone()
         return row is not None
 
+    def set_rate(self, user_id: str, rate: float) -> None:
+        self.ensure_user(user_id)
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET rate = ? WHERE user_id = ?", (rate, user_id)
+            )
+
+    def set_clickup_settings(self, user_id: str, **fields) -> None:
+        self.ensure_user(user_id)
+        column_map = {
+            "api_token": "clickup_api_token",
+            "workspace_id": "clickup_workspace_id",
+            "team_id": "clickup_team_id",
+            "user_id": "clickup_user_id",
+            "username": "clickup_username",
+        }
+        assignments, values = [], []
+        for key, value in fields.items():
+            if key not in column_map:
+                continue
+            if key == "api_token" and value is not None:
+                value = crypto.encrypt(value)
+            assignments.append(f"{column_map[key]} = ?")
+            values.append(value)
+        if not assignments:
+            return
+        values.append(user_id)
+        with self._lock:
+            self.conn.execute(
+                f"UPDATE users SET {', '.join(assignments)} WHERE user_id = ?", values
+            )
+
+    def clear_clickup_settings(self, user_id: str) -> None:
+        self.ensure_user(user_id)
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET clickup_api_token = NULL, clickup_workspace_id = NULL, "
+                "clickup_team_id = NULL, clickup_user_id = NULL, clickup_username = NULL "
+                "WHERE user_id = ?",
+                (user_id,),
+            )
+
+    def add_synced_session(self, user_id: str, entry_id: str, date: str,
+                           session: Dict[str, Any]) -> bool:
+        """Атомарно: пометить запись синхронизированной И вставить сессию.
+        Возвращает True, если сессия добавлена (запись была новой)."""
+        self.ensure_user(user_id)
+        with self._lock:
+            self.conn.execute("BEGIN IMMEDIATE")
+            try:
+                cur = self.conn.execute(
+                    "INSERT OR IGNORE INTO synced_entries (user_id, entry_id) VALUES (?, ?)",
+                    (user_id, entry_id),
+                )
+                if cur.rowcount != 1:
+                    self.conn.execute("ROLLBACK")
+                    return False
+                self.conn.execute(
+                    "INSERT INTO work_sessions (user_id, date, duration_ms, earnings, "
+                    "timestamp, source, clickup_id, task_name, project_name, description) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        user_id,
+                        date,
+                        int(session.get("duration_ms", 0)),
+                        float(session.get("earnings", 0)),
+                        session.get("timestamp"),
+                        session.get("source", "clickup"),
+                        session.get("clickup_id"),
+                        session.get("task_name"),
+                        session.get("project_name"),
+                        session.get("description", ""),
+                    ),
+                )
+                self.conn.execute("COMMIT")
+                return True
+            except Exception:
+                self.conn.execute("ROLLBACK")
+                raise
+
     def format_hours_minutes(self, total_hours: float) -> str:
         """Форматирование времени в формат 'Xч Yм'"""
         hours = int(total_hours)
