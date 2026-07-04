@@ -1,3 +1,5 @@
 .env
 salary_data.json
 salary_data copy.json
+salary.db*
+salary_data.json.migrated-*
