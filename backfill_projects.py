@@ -7,7 +7,7 @@
 дат, встречающихся в данных, строим карту {clickup_id -> list_id}, резолвим
 названия списков и заполняем project_name у подходящих сессий.
 
-Запуск:  python backfill_projects.py
+Запуск:  python backfill_projects.py   (после миграции на SQLite)
 """
 import asyncio
 from datetime import datetime, timedelta
@@ -17,11 +17,27 @@ from data_manager import DataManager
 CHUNK_DAYS = 30
 
 
-def _clickup_sessions_missing_project(user_data):
-    for date_str, day in user_data.get("work_sessions", {}).items():
-        for session in day.get("sessions", []):
-            if session.get("source") == "clickup" and not session.get("project_name"):
-                yield date_str, session
+def _pending_sessions(dm: DataManager, user_id: str):
+    """[(date_str, clickup_id), ...] clickup-сессий без project_name."""
+    with dm._lock:
+        rows = dm.conn.execute(
+            "SELECT date, clickup_id FROM work_sessions "
+            "WHERE user_id = ? AND source = 'clickup' AND clickup_id IS NOT NULL "
+            "AND (project_name IS NULL OR project_name = '')",
+            (user_id,),
+        ).fetchall()
+    return [(r["date"], r["clickup_id"]) for r in rows]
+
+
+def _set_project_name(dm: DataManager, user_id: str, clickup_id: str, name: str) -> int:
+    with dm._lock:
+        cur = dm.conn.execute(
+            "UPDATE work_sessions SET project_name = ? "
+            "WHERE user_id = ? AND clickup_id = ? "
+            "AND (project_name IS NULL OR project_name = '')",
+            (name, user_id, clickup_id),
+        )
+    return cur.rowcount
 
 
 async def backfill_user(dm: DataManager, user_id: str) -> int:
@@ -30,8 +46,7 @@ async def backfill_user(dm: DataManager, user_id: str) -> int:
         print(f"[{user_id}] ClickUp не настроен — пропуск")
         return 0
 
-    user_data = dm.get_user_data(user_id)
-    pending = list(_clickup_sessions_missing_project(user_data))
+    pending = _pending_sessions(dm, user_id)
     if not pending:
         print(f"[{user_id}] нечего заполнять")
         return 0
@@ -55,14 +70,13 @@ async def backfill_user(dm: DataManager, user_id: str) -> int:
 
     list_name_cache: dict[str, str] = {}
     updated = 0
-    for _date_str, session in pending:
-        list_id = entry_to_list.get(str(session.get("clickup_id")))
+    for _date_str, clickup_id in pending:
+        list_id = entry_to_list.get(str(clickup_id))
         if not list_id:
             continue
         name = await dm._resolve_list_name(client, list_id, list_name_cache)
         if name:
-            session["project_name"] = name
-            updated += 1
+            updated += _set_project_name(dm, user_id, clickup_id, name)
 
     print(f"[{user_id}] обновлено сессий: {updated} из {len(pending)}")
     return updated
@@ -70,17 +84,15 @@ async def backfill_user(dm: DataManager, user_id: str) -> int:
 
 async def main():
     dm = DataManager()
+    with dm._lock:
+        user_ids = [r["user_id"] for r in dm.conn.execute("SELECT user_id FROM users")]
     total = 0
-    for user_id in list(dm.data.keys()):
+    for user_id in user_ids:
         try:
             total += await backfill_user(dm, user_id)
         except Exception as e:
             print(f"[{user_id}] ошибка backfill: {e!r} — пропуск пользователя")
-    if total:
-        dm.save_data()
-        print(f"Готово. Всего обновлено: {total}. Данные сохранены.")
-    else:
-        print("Изменений нет — файл не тронут.")
+    print(f"Готово. Всего обновлено: {total}." if total else "Изменений нет.")
 
 
 if __name__ == "__main__":
