@@ -1,91 +1,91 @@
-import json
 import logging
-import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
+import crypto
+import db
 from clickup_client import ClickUpClient
 
 logger = logging.getLogger(__name__)
 
-DATA_FILE = "salary_data.json"
+DB_FILE = "salary.db"
+MS_PER_HOUR = 3_600_000
+
+_CLICKUP_KEYS = ("api_token", "workspace_id", "team_id", "user_id", "username")
 
 
 class DataManager:
-    """Управление данными пользователей и генерация отчётов"""
+    """Управление данными пользователей и генерация отчётов (хранилище — SQLite)."""
 
-    def __init__(self, data_file: str = DATA_FILE):
-        self.data_file = data_file
-        self.data = self.load_data()
+    def __init__(self, db_path: str = DB_FILE):
+        self.db_path = db_path
+        self.conn = db.get_connection(db_path)
 
-    def load_data(self) -> Dict[str, Any]:
-        """Загрузка данных из файла"""
-        if os.path.exists(self.data_file):
-            try:
-                with open(self.data_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    for user_id, user_data in data.items():
-                        if "clickup_synced_entries" in user_data and isinstance(user_data["clickup_synced_entries"], list):
-                            user_data["clickup_synced_entries"] = set(user_data["clickup_synced_entries"])
-                    return data
-            except Exception:
-                # Сохраняем повреждённый файл, чтобы следующий save_data его не затёр
-                backup = f"{self.data_file}.corrupt-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-                try:
-                    os.replace(self.data_file, backup)
-                    logger.error(f"Не удалось прочитать {self.data_file}, повреждённый файл сохранён как {backup}")
-                except OSError:
-                    logger.exception(f"Не удалось прочитать {self.data_file} и сделать бэкап")
-                return {}
-        return {}
+    def ensure_user(self, user_id: str) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO users (user_id, rate) VALUES (?, 0)", (user_id,)
+        )
 
-    def save_data(self):
-        """Сохранение данных в файл (атомарно: временный файл + rename)"""
-        data_to_save = {}
-        for user_id, user_data in self.data.items():
-            data_to_save[user_id] = user_data.copy()
-            if "clickup_synced_entries" in data_to_save[user_id]:
-                data_to_save[user_id]["clickup_synced_entries"] = list(data_to_save[user_id]["clickup_synced_entries"])
+    def get_rate(self, user_id: str) -> float:
+        row = self.conn.execute(
+            "SELECT rate FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        return row["rate"] if row else 0.0
 
-        tmp_file = f"{self.data_file}.tmp"
-        with open(tmp_file, 'w', encoding='utf-8') as f:
-            json.dump(data_to_save, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_file, self.data_file)
+    def get_clickup_settings(self, user_id: str) -> Dict[str, Any]:
+        row = self.conn.execute(
+            "SELECT clickup_api_token, clickup_workspace_id, clickup_team_id, "
+            "clickup_user_id, clickup_username FROM users WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return {k: None for k in _CLICKUP_KEYS}
+        token = row["clickup_api_token"]
+        return {
+            "api_token": crypto.decrypt(token) if token else None,
+            "workspace_id": row["clickup_workspace_id"],
+            "team_id": row["clickup_team_id"],
+            "user_id": row["clickup_user_id"],
+            "username": row["clickup_username"],
+        }
 
-    def get_user_data(self, user_id: str) -> Dict[str, Any]:
-        """Получение данных пользователя"""
-        if user_id not in self.data:
-            self.data[user_id] = {
-                "rate": 0,
-                "work_sessions": {},
-                "clickup_synced_entries": set(),
-                "clickup_settings": {
-                    "api_token": None,
-                    "workspace_id": None,
-                    "team_id": None,
-                    "user_id": None,
-                    "username": None
-                }
-            }
+    def get_work_sessions(self, user_id: str) -> Dict[str, Any]:
+        cur = self.conn.execute(
+            "SELECT date, duration_ms, earnings, timestamp, source, clickup_id, "
+            "task_name, project_name, description FROM work_sessions "
+            "WHERE user_id = ? ORDER BY id",
+            (user_id,),
+        )
+        result: Dict[str, Any] = {}
+        for row in cur:
+            day = result.setdefault(
+                row["date"], {"total_hours": 0.0, "total_earnings": 0.0, "sessions": []}
+            )
+            ms = row["duration_ms"]
+            duration_hours = ms / MS_PER_HOUR
+            day["sessions"].append({
+                "duration_ms": ms,
+                "duration_hours": duration_hours,
+                "hours": ms // MS_PER_HOUR,
+                "minutes": (ms % MS_PER_HOUR) // 60_000,
+                "earnings": row["earnings"],
+                "timestamp": row["timestamp"],
+                "source": row["source"],
+                "clickup_id": row["clickup_id"],
+                "task_name": row["task_name"],
+                "project_name": row["project_name"],
+                "description": row["description"],
+            })
+            day["total_hours"] += duration_hours
+            day["total_earnings"] += row["earnings"]
+        return result
 
-        if "clickup_synced_entries" not in self.data[user_id]:
-            self.data[user_id]["clickup_synced_entries"] = set()
-
-        if "clickup_settings" not in self.data[user_id]:
-            self.data[user_id]["clickup_settings"] = {
-                "api_token": None,
-                "workspace_id": None,
-                "team_id": None,
-                "user_id": None,
-                "username": None
-            }
-
-        if "user_id" not in self.data[user_id]["clickup_settings"]:
-            self.data[user_id]["clickup_settings"]["user_id"] = None
-        if "username" not in self.data[user_id]["clickup_settings"]:
-            self.data[user_id]["clickup_settings"]["username"] = None
-
-        return self.data[user_id]
+    def is_entry_synced(self, user_id: str, entry_id: str) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM synced_entries WHERE user_id = ? AND entry_id = ?",
+            (user_id, entry_id),
+        ).fetchone()
+        return row is not None
 
     def format_hours_minutes(self, total_hours: float) -> str:
         """Форматирование времени в формат 'Xч Yм'"""
@@ -463,15 +463,11 @@ class DataManager:
 
     def get_user_clickup_client(self, user_id: str) -> Optional[ClickUpClient]:
         """Получение ClickUp клиента для конкретного пользователя"""
-        user_data = self.get_user_data(user_id)
-        clickup_settings = user_data.get("clickup_settings", {})
-
-        api_token = clickup_settings.get("api_token")
-        workspace_id = clickup_settings.get("workspace_id")
-
+        settings = self.get_clickup_settings(user_id)
+        api_token = settings.get("api_token")
+        workspace_id = settings.get("workspace_id")
         if not api_token or not workspace_id:
             return None
-
         return ClickUpClient(api_token, workspace_id)
 
     async def validate_clickup_credentials(self, api_token: str, workspace_id: str) -> Dict[str, Any]:
