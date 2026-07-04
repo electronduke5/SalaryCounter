@@ -21,7 +21,7 @@ The application follows a single-file architecture with the main `SalaryBot` cla
 
 - **Data Management**: JSON-based persistence in `salary_data.json` with user-specific work sessions
 - **State Management**: FSM (Finite State Machine) for handling multi-step interactions (rate setting, time input)
-- **Command Handlers**: Telegram commands for user interactions (`/start`, `/setrate`, `/addtime`, etc.)
+- **Command Handlers**: Telegram commands for user interactions (`/start`, `/setrate`, etc.)
 
 ### Key Components
 
@@ -41,7 +41,6 @@ The application follows a single-file architecture with the main `SalaryBot` cla
 #### Basic Commands
 - `/start` - Welcome message and current rate display
 - `/setrate` - Set hourly rate (enters FSM state)
-- `/addtime` - Add work time in "hours minutes" format (enters FSM state)  
 - `/today` - Show today's earnings
 - `/yesterday` - Show yesterday's earnings
 - `/week` - Show last 7 days summary
@@ -111,4 +110,4 @@ Each task includes inline buttons:
 - Automatic synchronization with ClickUp time tracking
 - Integration with existing salary calculation system
 
-The bot uses Russian language for user interactions and expects time input in "HOURS MINUTES" format (e.g., "8 30" for 8 hours 30 minutes).
+The bot uses Russian language for user interactions. All work time comes from ClickUp time tracking (manual time entry is not supported); time entries are read-only — corrections are made in ClickUp and re-synced.

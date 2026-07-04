@@ -1,0 +1,178 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Unbounded", "Manrope", ui-sans-serif, sans-serif;
+
+  /* Dark fintech palette */
+  --color-bg: #0b0e13;
+  --color-surface: #121722;
+  --color-surface-2: #1a2130;
+  --color-edge: #232c3d;
+  --color-ink: #eff3f8;
+  --color-mist: #8792a5;
+
+  /* Acid accent — money & CTAs */
+  --color-acid: #c6f455;
+  --color-acid-deep: #9bd32b;
+
+  /* Running timer */
+  --color-ember: #ffb454;
+}
+
+html {
+  background: var(--color-bg);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background:
+    radial-gradient(120% 60% at 50% -10%, #141c2b 0%, transparent 60%),
+    var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+::selection {
+  background: var(--color-acid);
+  color: #0d1206;
+}
+
+/* Page shell */
+.page {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: max(env(safe-area-inset-top), 16px) 16px 7.5rem;
+  min-height: 100dvh;
+}
+
+/* Card surface */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-edge);
+  border-radius: 1.375rem;
+}
+
+/* Form field */
+.field {
+  width: 100%;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-edge);
+  border-radius: 0.875rem;
+  padding: 0.75rem 1rem;
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field::placeholder {
+  color: var(--color-mist);
+  font-weight: 500;
+}
+.field:focus {
+  border-color: var(--color-acid);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-acid) 18%, transparent);
+}
+.field:disabled {
+  opacity: 0.5;
+}
+/* Hide number input spinners */
+.field::-webkit-outer-spin-button,
+.field::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.field[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.875rem;
+  background: var(--color-surface-2);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Staggered page-load reveal */
+.reveal {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulsing dot for the live timer */
+.pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ember) 55%, transparent);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* Page transitions */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Film grain overlay */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
