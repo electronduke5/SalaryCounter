@@ -1,3 +1,4 @@
+import pytest
 from cryptography.fernet import Fernet
 
 
@@ -50,3 +51,26 @@ def test_add_synced_session_aggregates_and_dedups(tmp_path, monkeypatch):
     assert abs(ws["2026-07-04"]["total_hours"] - 1.5) < 1e-9
     assert ws["2026-07-04"]["total_earnings"] == 750.0
     assert dm.is_entry_synced("42", "e1") is True
+
+
+def test_count_synced_entries(tmp_path, monkeypatch):
+    dm = _dm(tmp_path, monkeypatch)
+    assert dm.count_synced_entries("42") == 0
+    dm.add_synced_session("42", "e1", "2026-07-04",
+                           _session(60 * 60 * 1000, 500.0, "e1"))
+    dm.add_synced_session("42", "e2", "2026-07-04",
+                           _session(60 * 60 * 1000, 500.0, "e2"))
+    assert dm.count_synced_entries("42") == 2
+    # duplicate entry_id must not double-count
+    dm.add_synced_session("42", "e1", "2026-07-04",
+                           _session(60 * 60 * 1000, 500.0, "e1"))
+    assert dm.count_synced_entries("42") == 2
+    # other users unaffected
+    assert dm.count_synced_entries("99") == 0
+
+
+def test_data_manager_requires_encryption_key(tmp_path, monkeypatch):
+    monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
+    from data_manager import DataManager
+    with pytest.raises(RuntimeError):
+        DataManager(str(tmp_path / "x.db"))

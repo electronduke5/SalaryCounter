@@ -876,9 +876,7 @@ class SalaryBot:
             else:
                 response += "\n⏹ Активных таймеров нет"
 
-            synced_count = self.data_manager.conn.execute(
-                "SELECT COUNT(*) FROM synced_entries WHERE user_id = ?", (user_id,)
-            ).fetchone()[0]
+            synced_count = self.data_manager.count_synced_entries(user_id)
             response += f"\n\n📊 Синхронизировано записей: {synced_count}"
 
             if not clickup_user_id:

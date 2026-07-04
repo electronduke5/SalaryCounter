@@ -447,9 +447,7 @@ async def clickup_status(user_id: str = Depends(get_current_user)):
         "username": clickup_settings.get("username"),
         "workspace_id": clickup_settings.get("workspace_id"),
         "active_timer": active_timer,
-        "synced_count": data_manager.conn.execute(
-            "SELECT COUNT(*) FROM synced_entries WHERE user_id = ?", (user_id,)
-        ).fetchone()[0],
+        "synced_count": data_manager.count_synced_entries(user_id),
         "user_id_set": bool(clickup_settings.get("user_id")),
     }
 

@@ -22,6 +22,7 @@ class DataManager:
         self.db_path = db_path
         self.conn = db.get_connection(db_path)
         self._lock = threading.Lock()
+        crypto.get_fernet()  # fail fast at startup if ENCRYPTION_KEY is missing/invalid
 
     def ensure_user(self, user_id: str) -> None:
         with self._lock:
@@ -93,6 +94,13 @@ class DataManager:
                 (user_id, entry_id),
             ).fetchone()
         return row is not None
+
+    def count_synced_entries(self, user_id: str) -> int:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT COUNT(*) FROM synced_entries WHERE user_id = ?", (user_id,)
+            ).fetchone()
+            return row[0]
 
     def set_rate(self, user_id: str, rate: float) -> None:
         self.ensure_user(user_id)
