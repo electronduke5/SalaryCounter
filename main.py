@@ -37,6 +37,8 @@ class SalaryBot:
     def __init__(self, token: str):
         self.bot = Bot(token=token)
         self.dp = Dispatcher(storage=MemoryStorage())
+        import migrate_to_sqlite
+        migrate_to_sqlite.migrate()
         self.data_manager = DataManager()
         self.setup_handlers()
 
@@ -454,7 +456,7 @@ class SalaryBot:
         @self.dp.message(Command("start"))
         async def start_command(message: Message, state: FSMContext):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
             welcome_text = (
                 "🎯 Добро пожаловать в бота для подсчета зарплаты!\n\n"
@@ -481,8 +483,8 @@ class SalaryBot:
                 "/help - показать полную справку\n\n"
             )
 
-            if user_data["rate"] > 0:
-                welcome_text += f"💰 Ваша текущая ставка: {user_data['rate']} руб/час"
+            if rate > 0:
+                welcome_text += f"💰 Ваша текущая ставка: {rate} руб/час"
             else:
                 welcome_text += "⚠️ Сначала установите свою ставку командой /setrate"
 
@@ -552,9 +554,7 @@ class SalaryBot:
                     return
 
                 user_id = str(message.from_user.id)
-                user_data = self.data_manager.get_user_data(user_id)
-                user_data["rate"] = rate
-                self.data_manager.save_data()
+                self.data_manager.set_rate(user_id, rate)
 
                 await message.answer(f"✅ Ставка установлена: {rate} руб/час")
                 await state.clear()
@@ -595,9 +595,7 @@ class SalaryBot:
                 return
 
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            user_data["clickup_settings"]["api_token"] = token
-            self.data_manager.save_data()
+            self.data_manager.set_clickup_settings(user_id, api_token=token)
 
             await message.answer("✅ API Token сохранен!\n\n"
                                  "Теперь отправьте Workspace ID командой /clickup_workspace")
@@ -619,9 +617,8 @@ class SalaryBot:
                 return
 
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
 
-            api_token = user_data["clickup_settings"].get("api_token")
+            api_token = self.data_manager.get_clickup_settings(user_id).get("api_token")
             if not api_token:
                 await message.answer("❌ Сначала установите API токен командой /clickup_token")
                 return
@@ -631,11 +628,13 @@ class SalaryBot:
             validation_result = await self.data_manager.validate_clickup_credentials(api_token, workspace_id)
 
             if validation_result["success"]:
-                user_data["clickup_settings"]["workspace_id"] = workspace_id
-                user_data["clickup_settings"]["team_id"] = validation_result["team_id"]
-                user_data["clickup_settings"]["user_id"] = validation_result["user_id"]
-                user_data["clickup_settings"]["username"] = validation_result["username"]
-                self.data_manager.save_data()
+                self.data_manager.set_clickup_settings(
+                    user_id,
+                    workspace_id=workspace_id,
+                    team_id=validation_result["team_id"],
+                    user_id=validation_result["user_id"],
+                    username=validation_result["username"],
+                )
 
                 await message.answer(f"✅ ClickUp интеграция настроена успешно!\n\n"
                                      f"👤 Пользователь: {validation_result['username']}\n"
@@ -654,16 +653,7 @@ class SalaryBot:
         @self.dp.message(Command("clickup_reset"))
         async def clickup_reset_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-
-            user_data["clickup_settings"] = {
-                "api_token": None,
-                "workspace_id": None,
-                "team_id": None,
-                "user_id": None,
-                "username": None
-            }
-            self.data_manager.save_data()
+            self.data_manager.clear_clickup_settings(user_id)
 
             await message.answer("🗑 Настройки ClickUp сброшены.\n\n"
                                  "Для повторной настройки используйте /clickup_setup")
@@ -690,13 +680,14 @@ class SalaryBot:
                                          "• Статус ClickUp API")
                     return
 
-                user_data = self.data_manager.get_user_data(user_id)
-                user_data["clickup_settings"]["user_id"] = current_user.get('id')
-                user_data["clickup_settings"]["username"] = current_user.get('username', current_user.get('email', 'Unknown'))
-                self.data_manager.save_data()
+                self.data_manager.set_clickup_settings(
+                    user_id,
+                    user_id=current_user.get('id'),
+                    username=current_user.get('username', current_user.get('email', 'Unknown')),
+                )
 
                 await message.answer(f"✅ Информация о пользователе обновлена!\n\n"
-                                     f"👤 Имя пользователя: {user_data['clickup_settings']['username']}\n"
+                                     f"👤 Имя пользователя: {self.data_manager.get_clickup_settings(user_id)['username']}\n"
                                      f"🆔 User ID: {current_user.get('id')}\n\n"
                                      f"Теперь команда /tasks будет показывать только ваши задачи.")
 
@@ -708,9 +699,9 @@ class SalaryBot:
         @self.dp.message(Command("tasksummary"))
         async def task_summary_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await message.answer("❌ Сначала установите ставку командой /setrate")
                 return
 
@@ -763,13 +754,13 @@ class SalaryBot:
         @self.dp.message(Command("syncclickup"))
         async def sync_clickup_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
             if not self.data_manager.get_user_clickup_client(user_id):
                 await message.answer("❌ ClickUp не настроен для вашего аккаунта\n\nИспользуйте /clickup_setup для настройки")
                 return
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await message.answer("❌ Сначала установите ставку командой /setrate")
                 return
 
@@ -798,13 +789,13 @@ class SalaryBot:
         @self.dp.message(Command("synclast"))
         async def sync_last_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
             if not self.data_manager.get_user_clickup_client(user_id):
                 await message.answer("❌ ClickUp не настроен для вашего аккаунта\n\nИспользуйте /clickup_setup для настройки")
                 return
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await message.answer("❌ Сначала установите ставку командой /setrate")
                 return
 
@@ -861,9 +852,9 @@ class SalaryBot:
 
             current_timer = await clickup_client.get_current_timer()
 
-            user_data = self.data_manager.get_user_data(user_id)
-            clickup_username = user_data["clickup_settings"].get("username", "Неизвестно")
-            clickup_user_id = user_data["clickup_settings"].get("user_id")
+            clickup_settings = self.data_manager.get_clickup_settings(user_id)
+            clickup_username = clickup_settings.get("username", "Неизвестно")
+            clickup_user_id = clickup_settings.get("user_id")
 
             response = "✅ ClickUp интеграция активна\n\n"
             response += f"👤 Пользователь: {clickup_username}\n"
@@ -885,7 +876,9 @@ class SalaryBot:
             else:
                 response += "\n⏹ Активных таймеров нет"
 
-            synced_count = len(user_data.get("clickup_synced_entries", set()))
+            synced_count = self.data_manager.conn.execute(
+                "SELECT COUNT(*) FROM synced_entries WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
             response += f"\n\n📊 Синхронизировано записей: {synced_count}"
 
             if not clickup_user_id:
@@ -896,57 +889,57 @@ class SalaryBot:
         @self.dp.message(Command("today"))
         async def today_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_today_report(user_data)
+            content = self.data_manager.generate_today_report(
+                self.data_manager.get_work_sessions(user_id))
             await self.send_earnings_report(message, "today", content)
 
         @self.dp.message(Command("yesterday"))
         async def yesterday_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_yesterday_report(user_data)
+            content = self.data_manager.generate_yesterday_report(
+                self.data_manager.get_work_sessions(user_id))
             await self.send_earnings_report(message, "yesterday", content)
 
         @self.dp.message(Command("week"))
         async def week_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_week_report(user_data)
+            content = self.data_manager.generate_week_report(
+                self.data_manager.get_work_sessions(user_id))
             await self.send_earnings_report(message, "week", content)
 
         @self.dp.message(Command("weekdetails"))
         async def week_details_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_week_details_report(user_data)
+            content = self.data_manager.generate_week_details_report(
+                self.data_manager.get_work_sessions(user_id))
             await self.send_earnings_report(message, "week_details", content)
 
         @self.dp.message(Command("month"))
         async def month_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_month_report(user_data)
+            content = self.data_manager.generate_month_report(
+                self.data_manager.get_work_sessions(user_id))
             await self.send_earnings_report(message, "month", content)
 
         @self.dp.message(Command("monthweeks"))
         async def month_weeks_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_month_weeks_report(user_data)
+            content = self.data_manager.generate_month_weeks_report(
+                self.data_manager.get_work_sessions(user_id))
             await self.send_earnings_report(message, "month_weeks", content)
 
         @self.dp.message(Command("prevmonthweeks"))
         async def prev_month_weeks_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_prev_month_weeks_report(user_data)
+            content = self.data_manager.generate_prev_month_weeks_report(
+                self.data_manager.get_work_sessions(user_id))
             await self.send_earnings_report(message, "prev_month_weeks", content)
 
         @self.dp.message(Command("year"))
         async def year_command(message: Message):
             user_id = str(message.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_year_report(user_data)
+            content = self.data_manager.generate_year_report(
+                self.data_manager.get_work_sessions(user_id))
             await self.send_earnings_report(message, "year", content)
 
         @self.dp.message(Command("tasks"))
@@ -1606,8 +1599,8 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_today")
         async def handle_earnings_today(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_today_report(user_data)
+            content = self.data_manager.generate_today_report(
+                self.data_manager.get_work_sessions(user_id))
 
             keyboard = self.create_earnings_keyboard("today")
             await callback.message.edit_text(content, reply_markup=keyboard)
@@ -1616,8 +1609,8 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_yesterday")
         async def handle_earnings_yesterday(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_yesterday_report(user_data)
+            content = self.data_manager.generate_yesterday_report(
+                self.data_manager.get_work_sessions(user_id))
 
             keyboard = self.create_earnings_keyboard("yesterday")
             await callback.message.edit_text(content, reply_markup=keyboard)
@@ -1626,8 +1619,8 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_week")
         async def handle_earnings_week(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_week_report(user_data)
+            content = self.data_manager.generate_week_report(
+                self.data_manager.get_work_sessions(user_id))
 
             keyboard = self.create_earnings_keyboard("week")
             await callback.message.edit_text(content, reply_markup=keyboard)
@@ -1636,8 +1629,8 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_month")
         async def handle_earnings_month(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_month_report(user_data)
+            content = self.data_manager.generate_month_report(
+                self.data_manager.get_work_sessions(user_id))
 
             keyboard = self.create_earnings_keyboard("month")
             await callback.message.edit_text(content, reply_markup=keyboard)
@@ -1646,8 +1639,8 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_week_details")
         async def handle_earnings_week_details(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_week_details_report(user_data)
+            content = self.data_manager.generate_week_details_report(
+                self.data_manager.get_work_sessions(user_id))
 
             keyboard = self.create_earnings_keyboard("week_details")
             await callback.message.edit_text(content, reply_markup=keyboard)
@@ -1656,8 +1649,8 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_month_weeks")
         async def handle_earnings_month_weeks(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_month_weeks_report(user_data)
+            content = self.data_manager.generate_month_weeks_report(
+                self.data_manager.get_work_sessions(user_id))
 
             keyboard = self.create_earnings_keyboard("month_weeks")
             await callback.message.edit_text(content, reply_markup=keyboard)
@@ -1666,8 +1659,8 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_prev_month_weeks")
         async def handle_earnings_prev_month_weeks(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_prev_month_weeks_report(user_data)
+            content = self.data_manager.generate_prev_month_weeks_report(
+                self.data_manager.get_work_sessions(user_id))
 
             keyboard = self.create_earnings_keyboard("prev_month_weeks")
             await callback.message.edit_text(content, reply_markup=keyboard)
@@ -1676,8 +1669,8 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_year")
         async def handle_earnings_year(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
-            content = self.data_manager.generate_year_report(user_data)
+            content = self.data_manager.generate_year_report(
+                self.data_manager.get_work_sessions(user_id))
 
             keyboard = self.create_earnings_keyboard("year")
             await callback.message.edit_text(content, reply_markup=keyboard)
@@ -1687,9 +1680,9 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "tasks_summary_today")
         async def handle_tasks_summary_today(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
                 return
 
@@ -1704,9 +1697,9 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "tasks_summary_yesterday")
         async def handle_tasks_summary_yesterday(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
                 return
 
@@ -1721,9 +1714,9 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "tasks_summary_week")
         async def handle_tasks_summary_week(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
                 return
 
@@ -1738,9 +1731,9 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "tasks_summary_month")
         async def handle_tasks_summary_month(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
                 return
 
@@ -1755,9 +1748,9 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "tasks_summary_7days")
         async def handle_tasks_summary_7days(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
                 return
 
@@ -1772,9 +1765,9 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "tasks_summary_30days")
         async def handle_tasks_summary_30days(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            user_data = self.data_manager.get_user_data(user_id)
+            rate = self.data_manager.get_rate(user_id)
 
-            if user_data["rate"] <= 0:
+            if rate <= 0:
                 await callback.answer("❌ Сначала установите ставку командой /setrate", show_alert=True)
                 return
 
