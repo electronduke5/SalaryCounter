@@ -1,4 +1,3 @@
-import glob
 import json
 import logging
 import os
@@ -12,6 +11,12 @@ logger = logging.getLogger(__name__)
 DATA_FILE = "salary_data.json"
 DB_FILE = "salary.db"
 MS_PER_HOUR = 3_600_000
+
+
+def _remove_with_sidecars(path):
+    for p in (path, f"{path}-wal", f"{path}-shm"):
+        if os.path.exists(p):
+            os.remove(p)
 
 
 def _insert_user(conn, user_id, user):
@@ -142,15 +147,17 @@ def migrate(json_path: str = DATA_FILE, db_path: str = DB_FILE) -> bool:
         _verify(conn, data)
     except Exception:
         conn.close()
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        _remove_with_sidecars(tmp_path)
         raise
     conn.close()
 
+    # Best-effort narrowing of the race, NOT a lock: both processes build from the
+    # same JSON, so a clobber here would be content-equivalent anyway.
     if os.path.exists(db_path):                              # проиграли гонку другому процессу
-        os.remove(tmp_path)
+        _remove_with_sidecars(tmp_path)
         return False
     os.replace(tmp_path, db_path)                            # атомарно вводим БД
+    _remove_with_sidecars(tmp_path)                          # подчистить -wal/-shm siblings
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     try:
         os.replace(json_path, f"{json_path}.migrated-{ts}")
