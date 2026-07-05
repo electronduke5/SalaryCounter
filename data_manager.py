@@ -14,6 +14,11 @@ MS_PER_HOUR = 3_600_000
 
 _CLICKUP_KEYS = ("api_token", "workspace_id", "team_id", "user_id", "username")
 
+_NOTIFICATION_COLUMNS = (
+    "notify_daily_digest", "digest_time", "notify_weekly",
+    "notify_long_timer", "long_timer_hours", "autosync_enabled",
+)
+
 
 class DataManager:
     """Управление данными пользователей и генерация отчётов (хранилище — SQLite)."""
@@ -142,6 +147,57 @@ class DataManager:
                 "clickup_team_id = NULL, clickup_user_id = NULL, clickup_username = NULL "
                 "WHERE user_id = ?",
                 (user_id,),
+            )
+
+    def get_users_for_autosync(self) -> List[Dict[str, Any]]:
+        """Пользователи с настроенным ClickUp-токеном + их настройки шедулера."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT user_id, rate, autosync_enabled, notify_daily_digest, "
+                "digest_time, notify_weekly, notify_long_timer, long_timer_hours "
+                "FROM users WHERE clickup_api_token IS NOT NULL"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_notification_settings(self, user_id: str) -> Dict[str, Any]:
+        self.ensure_user(user_id)
+        with self._lock:
+            row = self.conn.execute(
+                f"SELECT {', '.join(_NOTIFICATION_COLUMNS)} FROM users WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return dict(row)
+
+    def set_notification_settings(self, user_id: str, **fields) -> None:
+        self.ensure_user(user_id)
+        assignments, values = [], []
+        for key, value in fields.items():
+            if key not in _NOTIFICATION_COLUMNS:
+                continue
+            assignments.append(f"{key} = ?")
+            values.append(value)
+        if not assignments:
+            return
+        values.append(user_id)
+        with self._lock:
+            self.conn.execute(
+                f"UPDATE users SET {', '.join(assignments)} WHERE user_id = ?", values
+            )
+
+    def was_notified(self, user_id: str, kind: str, ref: str) -> bool:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT 1 FROM notification_log WHERE user_id = ? AND kind = ? AND ref = ?",
+                (user_id, kind, ref),
+            ).fetchone()
+        return row is not None
+
+    def mark_notified(self, user_id: str, kind: str, ref: str) -> None:
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO notification_log (user_id, kind, ref, sent_at) "
+                "VALUES (?, ?, ?, ?)",
+                (user_id, kind, ref, datetime.now().isoformat()),
             )
 
     def add_synced_session(self, user_id: str, entry_id: str, date: str,
