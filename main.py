@@ -31,6 +31,57 @@ class SalaryStates(StatesGroup):
     waiting_for_rate = State()
     waiting_for_clickup_token = State()
     waiting_for_workspace_id = State()
+    waiting_for_digest_time = State()
+
+
+NOTIF_TOGGLE_FIELDS = {
+    "daily": "notify_daily_digest",
+    "weekly": "notify_weekly",
+    "timer": "notify_long_timer",
+    "autosync": "autosync_enabled",
+}
+
+
+def valid_hhmm(value: str) -> bool:
+    parts = value.split(":")
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        return False
+    hours, minutes = int(parts[0]), int(parts[1])
+    return 0 <= hours <= 23 and 0 <= minutes <= 59
+
+
+def build_notifications_view(settings: Dict[str, Any]) -> tuple:
+    """Текст и клавиатура экрана /notifications по текущим настройкам."""
+    def mark(field):
+        return "✅" if settings.get(field) else "❌"
+
+    text = (
+        "🔔 Настройки уведомлений и автосинка:\n\n"
+        f"{mark('autosync_enabled')} Автосинк ClickUp (фоновый)\n"
+        f"{mark('notify_daily_digest')} Вечерний дайджест в {settings.get('digest_time', '21:00')}\n"
+        f"{mark('notify_weekly')} Недельная сводка (вс)\n"
+        f"{mark('notify_long_timer')} Алерт «забытый таймер» "
+        f"(> {settings.get('long_timer_hours', 4):g} ч)\n\n"
+        "Нажмите, чтобы переключить:"
+    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=f"{mark('autosync_enabled')} Автосинк",
+            callback_data="notif_toggle_autosync")],
+        [InlineKeyboardButton(
+            text=f"{mark('notify_daily_digest')} Дайджест",
+            callback_data="notif_toggle_daily")],
+        [InlineKeyboardButton(
+            text=f"{mark('notify_weekly')} Недельная сводка",
+            callback_data="notif_toggle_weekly")],
+        [InlineKeyboardButton(
+            text=f"{mark('notify_long_timer')} Забытый таймер",
+            callback_data="notif_toggle_timer")],
+        [InlineKeyboardButton(
+            text=f"🕘 Время дайджеста: {settings.get('digest_time', '21:00')}",
+            callback_data="notif_digest_time")],
+    ])
+    return text, keyboard
 
 
 class SalaryBot:
@@ -524,7 +575,8 @@ class SalaryBot:
                 "/clickup_reset - сбросить настройки ClickUp\n"
                 "/syncclickup - синхронизировать данные за сегодня\n"
                 "/synclast [дни] - синхронизировать за последние N дней (по умолчанию 7)\n"
-                "/clickupstatus - статус интеграции и активные таймеры\n\n"
+                "/clickupstatus - статус интеграции и активные таймеры\n"
+                "/notifications - автосинк и уведомления (дайджест, сводка, забытый таймер)\n\n"
                 "📊 Аналитика задач:\n"
                 "/tasksummary - сводка по задачам за неделю\n"
                 "/tasksummary today - сводка за сегодня\n"
@@ -561,6 +613,54 @@ class SalaryBot:
 
             except ValueError:
                 await message.answer("❌ Пожалуйста, введите корректное число!")
+
+        @self.dp.message(Command("notifications"))
+        async def notifications_command(message: Message):
+            user_id = str(message.from_user.id)
+            settings = self.data_manager.get_notification_settings(user_id)
+            text, keyboard = build_notifications_view(settings)
+            await message.answer(text, reply_markup=keyboard)
+
+        @self.dp.callback_query(F.data.startswith("notif_toggle_"))
+        async def notif_toggle_callback(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            key = callback.data.removeprefix("notif_toggle_")
+            field = NOTIF_TOGGLE_FIELDS.get(key)
+            if not field:
+                await callback.answer()
+                return
+            settings = self.data_manager.get_notification_settings(user_id)
+            self.data_manager.set_notification_settings(
+                user_id, **{field: 0 if settings.get(field) else 1}
+            )
+            settings = self.data_manager.get_notification_settings(user_id)
+            text, keyboard = build_notifications_view(settings)
+            await callback.message.edit_text(text, reply_markup=keyboard)
+            await callback.answer()
+
+        @self.dp.callback_query(F.data == "notif_digest_time")
+        async def notif_digest_time_callback(callback: CallbackQuery, state: FSMContext):
+            await callback.message.answer(
+                "🕘 Введите время дайджеста в формате ЧЧ:ММ (например, 21:00):"
+            )
+            await state.set_state(SalaryStates.waiting_for_digest_time)
+            await callback.answer()
+
+        @self.dp.message(SalaryStates.waiting_for_digest_time)
+        async def process_digest_time(message: Message, state: FSMContext):
+            value = (message.text or "").strip()
+            if not valid_hhmm(value):
+                await message.answer("❌ Неверный формат. Введите время как ЧЧ:ММ, например 21:00")
+                return
+            user_id = str(message.from_user.id)
+            hours, minutes = value.split(":")
+            normalized = f"{int(hours):02d}:{int(minutes):02d}"
+            self.data_manager.set_notification_settings(user_id, digest_time=normalized)
+            await state.clear()
+            settings = self.data_manager.get_notification_settings(user_id)
+            text, keyboard = build_notifications_view(settings)
+            await message.answer(f"✅ Время дайджеста: {normalized}")
+            await message.answer(text, reply_markup=keyboard)
 
         @self.dp.message(Command("clickup_setup"))
         async def clickup_setup_command(message: Message):

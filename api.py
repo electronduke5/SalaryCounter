@@ -124,6 +124,7 @@ class TaskStatusUpdate(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     bot_task = None
+    scheduler_task = None
     try:
         if BOT_TOKEN:
             from main import SalaryBot
@@ -132,17 +133,23 @@ async def lifespan(app: FastAPI):
             salary_bot.data_manager = data_manager
             bot_task = asyncio.create_task(salary_bot.start_bot())
             logger.info("Bot polling started")
+
+            if os.getenv("SCHEDULER_ENABLED", "1") == "1":
+                from scheduler import BackgroundScheduler
+                scheduler = BackgroundScheduler(data_manager, salary_bot.bot)
+                scheduler_task = asyncio.create_task(scheduler.run())
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
 
     yield
 
-    if bot_task:
-        bot_task.cancel()
-        try:
-            await bot_task
-        except asyncio.CancelledError:
-            pass
+    for task in (scheduler_task, bot_task):
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(title="SalaryCounter API", lifespan=lifespan)
