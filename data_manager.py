@@ -1214,13 +1214,17 @@ class DataManager:
                     clickup_client, self._entry_list_id(entry), list_name_cache
                 )
 
+                # ClickUp отдаёт task='0' (строкой) для времени без привязки к задаче
+                task = entry.get('task')
+                task_name = task.get('name', 'Неизвестная задача') if isinstance(task, dict) else 'Без задачи'
+
                 clickup_session = {
                     "duration_ms": duration_ms,
                     "earnings": earnings,
                     "timestamp": datetime.fromtimestamp(start_timestamp).isoformat(),
                     "source": "clickup",
                     "clickup_id": entry_id,
-                    "task_name": entry.get('task', {}).get('name', 'Неизвестная задача') if entry.get('task') else 'Без задачи',
+                    "task_name": task_name,
                     "project_name": project_name,
                     "description": entry.get('description', ''),
                 }
