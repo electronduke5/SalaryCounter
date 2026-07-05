@@ -236,6 +236,100 @@ class DataManager:
             "days_left": last_dom - now.day,
         }
 
+    def get_hours_norm(self, user_id: str) -> float:
+        self.ensure_user(user_id)
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT monthly_hours_norm FROM users WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return row["monthly_hours_norm"] if row else 0.0
+
+    def set_hours_norm(self, user_id: str, hours: float) -> None:
+        self.ensure_user(user_id)
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET monthly_hours_norm = ? WHERE user_id = ?",
+                (hours, user_id),
+            )
+
+    @staticmethod
+    def _heatmap_level(hours: float) -> int:
+        if hours <= 0:
+            return 0
+        if hours < 2:
+            return 1
+        if hours < 4:
+            return 2
+        if hours < 6:
+            return 3
+        return 4
+
+    def get_activity_heatmap(self, user_id: str, year: int) -> List[Dict[str, Any]]:
+        """Дни года с активностью: часы, заработок и уровень интенсивности 0–4."""
+        prefix = f"{year}-"
+        out = []
+        for date_str, day in sorted(self.get_work_sessions(user_id).items()):
+            if not date_str.startswith(prefix):
+                continue
+            hours = day["total_hours"]
+            out.append({
+                "date": date_str,
+                "hours": hours,
+                "earnings": day["total_earnings"],
+                "level": self._heatmap_level(hours),
+            })
+        return out
+
+    def get_projects_breakdown(self, user_id: str, start_date: datetime,
+                               end_date: datetime) -> List[Dict[str, Any]]:
+        """Время/деньги по проектам за период, сортировка по заработку."""
+        start = start_date.strftime("%Y-%m-%d")
+        end = end_date.strftime("%Y-%m-%d")
+        totals: Dict[str, Dict[str, float]] = {}
+        for date_str, day in self.get_work_sessions(user_id).items():
+            if not (start <= date_str <= end):
+                continue
+            for session in day["sessions"]:
+                name = session.get("project_name") or "Без проекта"
+                agg = totals.setdefault(name, {"hours": 0.0, "earnings": 0.0})
+                agg["hours"] += session["duration_hours"]
+                agg["earnings"] += session["earnings"]
+        grand_total = sum(v["earnings"] for v in totals.values())
+        items = [
+            {
+                "project_name": name,
+                "hours": v["hours"],
+                "earnings": v["earnings"],
+                "share": v["earnings"] / grand_total if grand_total > 0 else 0,
+            }
+            for name, v in totals.items()
+        ]
+        items.sort(key=lambda i: i["earnings"], reverse=True)
+        return items
+
+    def get_hours_norm_stats(self, user_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+        """Норма часов месяца против факта; expected_by_today — норма × прошедшая доля месяца."""
+        now = now or datetime.now()
+        norm = self.get_hours_norm(user_id)
+        month_prefix = now.strftime("%Y-%m")
+        if now.month == 12:
+            days_in_month = 31
+        else:
+            days_in_month = (now.replace(day=1, month=now.month + 1) - timedelta(days=1)).day
+
+        actual_hours = 0.0
+        for date_str, day in self.get_work_sessions(user_id).items():
+            if date_str.startswith(month_prefix):
+                actual_hours += day["total_hours"]
+
+        expected = norm * now.day / days_in_month if norm > 0 else None
+        return {
+            "norm": norm,
+            "actual_hours": actual_hours,
+            "expected_by_today": expected,
+            "diff": actual_hours - expected if expected is not None else None,
+        }
+
     def get_users_for_autosync(self) -> List[Dict[str, Any]]:
         """Пользователи с настроенным ClickUp-токеном + их настройки шедулера."""
         with self._lock:

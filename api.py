@@ -693,13 +693,8 @@ async def stop_timer(user_id: str = Depends(get_current_user)):
     return {"success": True}
 
 
-@api.get("/analytics/tasks")
-async def analytics_tasks(
-    period: str = "week",
-    start: Optional[str] = None,
-    end: Optional[str] = None,
-    user_id: str = Depends(get_current_user),
-):
+def _resolve_period(period: str, start: Optional[str], end: Optional[str]) -> tuple:
+    """Разбор периода (preset или произвольный start/end) → (start_date, end_date, period, period_name)."""
     # A custom range (start/end) takes precedence over the named preset.
     if start and end:
         try:
@@ -716,12 +711,23 @@ async def analytics_tasks(
                 end_date.replace(hour=0, minute=0, second=0, microsecond=0),
                 start_date.replace(hour=23, minute=59, second=59, microsecond=0),
             )
-        period = "custom"
         period_name = f"{start_date.strftime('%d.%m.%Y')} — {end_date.strftime('%d.%m.%Y')}"
-    else:
-        # The webapp sends "7"/"30"; map them to the keys get_tasks_summary_by_period understands.
-        period_key = {"7": "7days", "30": "30days"}.get(period, period)
-        start_date, end_date, period_name = data_manager.get_tasks_summary_by_period(period_key)
+        return start_date, end_date, "custom", period_name
+
+    # The webapp sends "7"/"30"; map them to the keys get_tasks_summary_by_period understands.
+    period_key = {"7": "7days", "30": "30days"}.get(period, period)
+    start_date, end_date, period_name = data_manager.get_tasks_summary_by_period(period_key)
+    return start_date, end_date, period, period_name
+
+
+@api.get("/analytics/tasks")
+async def analytics_tasks(
+    period: str = "week",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    user_id: str = Depends(get_current_user),
+):
+    start_date, end_date, period, period_name = _resolve_period(period, start, end)
 
     summary = data_manager.get_tasks_summary(user_id, start_date, end_date)
 
@@ -758,6 +764,51 @@ async def analytics_tasks(
         "total_tasks": summary["total_tasks"],
         "total_sessions": summary["total_sessions"],
     }
+
+
+@api.get("/analytics/heatmap")
+async def analytics_heatmap(year: Optional[int] = None,
+                            user_id: str = Depends(get_current_user)):
+    year = year or datetime.now().year
+    return {"year": year, "days": data_manager.get_activity_heatmap(user_id, year)}
+
+
+@api.get("/analytics/projects")
+async def analytics_projects(
+    period: str = "month",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    user_id: str = Depends(get_current_user),
+):
+    start_date, end_date, period, period_name = _resolve_period(period, start, end)
+    projects = data_manager.get_projects_breakdown(user_id, start_date, end_date)
+    return {
+        "period": period,
+        "period_name": period_name,
+        "period_start": start_date.isoformat(),
+        "period_end": end_date.isoformat(),
+        "projects": projects,
+        "total_hours": sum(p["hours"] for p in projects),
+        "total_earnings": sum(p["earnings"] for p in projects),
+    }
+
+
+@api.get("/analytics/norm")
+async def analytics_norm(user_id: str = Depends(get_current_user)):
+    return data_manager.get_hours_norm_stats(user_id)
+
+
+class HoursNormUpdate(BaseModel):
+    hours: float
+
+
+@api.put("/user/hours-norm")
+async def update_hours_norm(body: HoursNormUpdate,
+                            user_id: str = Depends(get_current_user)):
+    if body.hours < 0:
+        raise HTTPException(status_code=400, detail="Hours norm must be non-negative")
+    data_manager.set_hours_norm(user_id, body.hours)
+    return {"hours": body.hours}
 
 
 # Mount the API under /api/v1
