@@ -1,8 +1,77 @@
 <template>
   <div class="page">
-    <AppHeader kicker="Аналитика" title="По задачам" />
+    <AppHeader kicker="Аналитика" :title="viewTitle" />
 
-    <div class="reveal mb-4 space-y-2">
+    <div class="reveal mb-3">
+      <SegmentedControl v-model="activeView" :options="views" />
+    </div>
+
+    <!-- Активность: heatmap + норма часов -->
+    <template v-if="activeView === 'activity'">
+      <template v-if="activityLoading">
+        <SkeletonBlock height="12rem" radius="1.375rem" class="mb-4" />
+        <SkeletonBlock height="8rem" radius="1.375rem" />
+      </template>
+      <template v-else>
+        <HeatmapCalendar
+          class="reveal mb-4"
+          :year="heatmapYear"
+          :days="heatmapDays"
+        />
+
+        <section class="card reveal mb-4 p-5" style="animation-delay: 60ms">
+          <h2 class="mb-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-mist">
+            <UIcon name="i-lucide-gauge" class="size-4" />
+            Норма часов в месяц
+          </h2>
+
+          <template v-if="norm.norm > 0">
+            <div class="mb-2 flex items-baseline justify-between">
+              <span class="font-display text-lg font-bold tabular-nums text-ink">
+                {{ formatHoursLabel(norm.actual_hours) }}
+              </span>
+              <span class="text-sm font-semibold text-mist">из {{ formatHoursLabel(norm.norm) }}</span>
+            </div>
+            <div class="relative mb-3 h-2.5 overflow-hidden rounded-full bg-surface-2">
+              <div
+                class="h-full rounded-full bg-acid transition-[width] duration-700"
+                :style="{ width: `${Math.min((norm.actual_hours / norm.norm) * 100, 100)}%` }"
+              />
+              <div
+                v-if="norm.expected_by_today !== null"
+                class="absolute top-0 h-full w-0.5 bg-ink/60"
+                :style="{ left: `${Math.min((norm.expected_by_today / norm.norm) * 100, 100)}%` }"
+              />
+            </div>
+            <p class="text-xs font-semibold" :class="(norm.diff ?? 0) >= 0 ? 'text-acid' : 'text-ember'">
+              {{ normDiffLabel }}
+            </p>
+          </template>
+
+          <p v-else class="mb-3 text-[13px] leading-relaxed text-mist">
+            Задайте норму часов на месяц, чтобы видеть темп и переработки.
+          </p>
+
+          <div class="mt-3 flex gap-2">
+            <input
+              v-model="normStr"
+              type="number"
+              min="0"
+              inputmode="numeric"
+              placeholder="Например, 160"
+              class="field flex-1"
+              :disabled="normSaving"
+            />
+            <AppButton :loading="normSaving" :disabled="normStr === ''" @click="saveNorm">
+              Сохранить
+            </AppButton>
+          </div>
+        </section>
+      </template>
+    </template>
+
+    <!-- Задачи / Проекты: общие фильтры периода -->
+    <div v-if="activeView !== 'activity'" class="reveal mb-4 space-y-2">
       <SegmentedControl v-model="activePeriod" :options="periods" />
       <UPopover
         v-model:open="calendarOpen"
@@ -41,7 +110,7 @@
       </UPopover>
     </div>
 
-    <template v-if="loading">
+    <template v-if="activeView !== 'activity' && loading">
       <div class="mb-4 flex gap-2">
         <SkeletonBlock v-for="i in 3" :key="i" height="5rem" radius="1.375rem" class="flex-1" />
       </div>
@@ -50,11 +119,54 @@
       </div>
     </template>
 
-    <div v-else-if="error" class="card reveal border-red-500/25 bg-red-500/8 p-4">
+    <div
+      v-else-if="activeView !== 'activity' && error"
+      class="card reveal border-red-500/25 bg-red-500/8 p-4"
+    >
       <p class="text-sm font-semibold text-red-300">{{ error }}</p>
     </div>
 
-    <template v-else>
+    <!-- Проекты -->
+    <template v-else-if="activeView === 'projects'">
+      <DonutChart v-if="projects.length" class="reveal mb-4" :items="projects" />
+
+      <section v-if="projects.length" class="reveal" style="animation-delay: 60ms">
+        <h2 class="mb-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-mist">Проекты</h2>
+        <div class="space-y-2">
+          <div v-for="p in projectRows" :key="p.name" class="card px-4 py-3.5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 flex-1 truncate text-[14px] font-semibold leading-tight text-ink">
+                {{ p.name }}
+              </div>
+              <div class="shrink-0 text-right">
+                <div class="text-sm font-bold tabular-nums text-ink">
+                  {{ formatHoursLabel(p.hours) }}
+                </div>
+                <div class="text-xs font-bold tabular-nums text-acid">
+                  {{ formatMoney(p.earnings) }} ₽
+                </div>
+              </div>
+            </div>
+            <div class="mt-2.5 h-1 overflow-hidden rounded-full bg-surface-2">
+              <div
+                class="h-full rounded-full bg-acid/70 transition-all duration-500"
+                :style="{ width: `${p.barShare}%` }"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <EmptyState
+        v-else
+        class="reveal"
+        icon="i-lucide-folder-open"
+        title="Нет данных за выбранный период"
+        hint="Синхронизируйте ClickUp, чтобы увидеть разбивку по проектам"
+      />
+    </template>
+
+    <template v-else-if="activeView === 'tasks'">
       <!-- Summary stat tiles -->
       <div class="reveal mb-4 grid grid-cols-3 gap-2">
         <div class="card px-3 py-4 text-center">
@@ -159,6 +271,81 @@ const periods = [
   { value: 'last_year', label: 'Прош. год' }
 ]
 
+const views = [
+  { value: 'tasks', label: 'Задачи' },
+  { value: 'projects', label: 'Проекты' },
+  { value: 'activity', label: 'Активность' }
+]
+const activeView = ref('tasks')
+const viewTitle = computed(
+  () => ({ tasks: 'По задачам', projects: 'По проектам', activity: 'Активность' })[activeView.value] ?? 'Аналитика'
+)
+
+// Проекты
+const projects = ref<any[]>([])
+const projectRows = computed(() => {
+  const max = Math.max(...projects.value.map(p => p.hours ?? 0), 0.01)
+  return projects.value.map(p => ({
+    name: p.project_name,
+    hours: p.hours ?? 0,
+    earnings: p.earnings ?? 0,
+    barShare: ((p.hours ?? 0) / max) * 100
+  }))
+})
+
+// Активность: heatmap + норма
+const activityLoading = ref(true)
+const activityLoaded = ref(false)
+const heatmapYear = new Date().getFullYear()
+const heatmapDays = ref<any[]>([])
+const norm = ref<{ norm: number; actual_hours: number; expected_by_today: number | null; diff: number | null }>({
+  norm: 0,
+  actual_hours: 0,
+  expected_by_today: null,
+  diff: null
+})
+const normStr = ref('')
+const normSaving = ref(false)
+const { haptic } = useTelegram()
+
+const normDiffLabel = computed(() => {
+  const diff = norm.value.diff ?? 0
+  const label = formatHoursLabel(Math.abs(diff))
+  return diff >= 0 ? `Опережение темпа на ${label}` : `Отставание от темпа на ${label}`
+})
+
+const loadActivity = async () => {
+  activityLoading.value = true
+  try {
+    const [heatmapRes, normRes] = await Promise.all([
+      api.get(`/analytics/heatmap?year=${heatmapYear}`).catch(() => null),
+      api.get('/analytics/norm').catch(() => null)
+    ])
+    heatmapDays.value = heatmapRes?.days ?? []
+    if (normRes) norm.value = normRes
+    activityLoaded.value = true
+  } finally {
+    activityLoading.value = false
+  }
+}
+
+const saveNorm = async () => {
+  const hours = parseFloat(normStr.value)
+  if (Number.isNaN(hours) || hours < 0) return
+  normSaving.value = true
+  try {
+    await api.put('/user/hours-norm', { hours })
+    normStr.value = ''
+    const normRes = await api.get('/analytics/norm')
+    norm.value = normRes
+    haptic.success()
+  } catch {
+    haptic.error()
+  } finally {
+    normSaving.value = false
+  }
+}
+
 const activePeriod = ref('week')
 // reka-ui's RangeCalendar dereferences modelValue.value.start unless the value is
 // strictly `undefined`; passing `null` throws during setup, so keep it undefined.
@@ -215,22 +402,43 @@ const load = async (query: string) => {
   loading.value = true
   error.value = null
   try {
-    const res = await api.get(`/analytics/tasks?${query}`)
-    taskList.value = Array.isArray(res.tasks) ? res.tasks : []
-    breakdown.value = res.breakdown ?? null
-    summary.value = {
-      total_hours: res.total_hours ?? 0,
-      total_earnings: res.total_earnings ?? 0
+    if (activeView.value === 'projects') {
+      const res = await api.get(`/analytics/projects?${query}`)
+      projects.value = Array.isArray(res.projects) ? res.projects : []
+    } else {
+      const res = await api.get(`/analytics/tasks?${query}`)
+      taskList.value = Array.isArray(res.tasks) ? res.tasks : []
+      breakdown.value = res.breakdown ?? null
+      summary.value = {
+        total_hours: res.total_hours ?? 0,
+        total_earnings: res.total_earnings ?? 0
+      }
     }
   } catch (e: any) {
     error.value = e.message
     taskList.value = []
+    projects.value = []
     breakdown.value = null
     summary.value = { total_hours: 0, total_earnings: 0 }
   } finally {
     loading.value = false
   }
 }
+
+const currentQuery = () => {
+  const r = customRange.value
+  if (isCustom.value && r) return `start=${r.start}&end=${r.end}`
+  return `period=${activePeriod.value || 'week'}`
+}
+
+// Переключение вкладки: активность грузится один раз, задачи/проекты — по текущему периоду.
+watch(activeView, (view) => {
+  if (view === 'activity') {
+    if (!activityLoaded.value) loadActivity()
+    return
+  }
+  load(currentQuery())
+})
 
 const applyRange = () => {
   if (!range.value?.start || !range.value?.end) return
