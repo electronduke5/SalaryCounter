@@ -675,4 +675,5 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api:app", host="0.0.0.0", port=API_PORT, reload=False)
+    # На проде API живёт за nginx — наружу торчать не должен; 0.0.0.0 задавать явно.
+    uvicorn.run("api:app", host=os.getenv("API_HOST", "127.0.0.1"), port=API_PORT, reload=False)
