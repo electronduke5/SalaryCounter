@@ -56,6 +56,100 @@
       </template>
     </section>
 
+    <!-- Goal & bonuses -->
+    <section class="card reveal mb-4 p-5" style="animation-delay: 90ms">
+      <h2 class="mb-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-mist">
+        <UIcon name="i-lucide-target" class="size-4" />
+        Цель и премии
+      </h2>
+
+      <div v-if="goalLoading" class="space-y-3">
+        <SkeletonBlock height="2.5rem" />
+      </div>
+
+      <template v-else>
+        <div class="mb-4 flex items-baseline justify-between">
+          <span class="text-sm text-mist">Цель на месяц</span>
+          <span class="font-display text-xl font-bold tabular-nums text-acid">
+            {{ currentGoal > 0 ? `${formatMoney(currentGoal)} ₽` : 'не задана' }}
+          </span>
+        </div>
+
+        <div class="mb-3 flex gap-2">
+          <input
+            v-model="newGoalStr"
+            type="number"
+            min="0"
+            inputmode="numeric"
+            placeholder="Цель, ₽ (0 — убрать)"
+            class="field flex-1"
+            :disabled="goalSaving"
+          />
+          <AppButton :loading="goalSaving" :disabled="newGoalStr === ''" @click="saveGoal">
+            Сохранить
+          </AppButton>
+        </div>
+
+        <p v-if="goalError" class="mb-3 text-sm font-semibold text-red-300">{{ goalError }}</p>
+        <p v-if="goalSuccess" class="mb-3 flex items-center gap-1.5 text-sm font-semibold text-acid">
+          <UIcon name="i-lucide-check" class="size-4" /> Цель обновлена
+        </p>
+
+        <ListRow
+          icon="i-lucide-gift"
+          title="Премии"
+          subtitle="Квартальные выплаты за год"
+          @click="router.push('/bonuses')"
+        />
+      </template>
+    </section>
+
+    <!-- Notifications -->
+    <section class="card reveal mb-4 p-5" style="animation-delay: 105ms">
+      <h2 class="mb-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-mist">
+        <UIcon name="i-lucide-bell" class="size-4" />
+        Автосинк и уведомления
+      </h2>
+
+      <div v-if="notifLoading" class="space-y-3">
+        <SkeletonBlock height="8rem" />
+      </div>
+
+      <div v-else class="space-y-1">
+        <label
+          v-for="toggle in notifToggles"
+          :key="toggle.field"
+          class="flex items-center justify-between gap-3 rounded-xl px-1 py-2.5"
+        >
+          <span class="min-w-0">
+            <span class="block text-[15px] font-semibold text-ink">{{ toggle.label }}</span>
+            <span class="mt-0.5 block text-xs text-mist">{{ toggle.hint }}</span>
+          </span>
+          <USwitch
+            :model-value="Boolean(notif[toggle.field])"
+            :disabled="notifSaving"
+            @update:model-value="(v: boolean) => saveNotif(toggle.field, v ? 1 : 0)"
+          />
+        </label>
+
+        <div class="flex items-center justify-between gap-3 rounded-xl px-1 py-2.5">
+          <span class="min-w-0">
+            <span class="block text-[15px] font-semibold text-ink">Время дайджеста</span>
+            <span class="mt-0.5 block text-xs text-mist">Когда присылать итоги дня</span>
+          </span>
+          <input
+            v-model="digestTime"
+            type="time"
+            class="field w-28 text-center"
+            :disabled="notifSaving"
+            @change="saveNotif('digest_time', digestTime)"
+          />
+        </div>
+
+        <p v-if="notifError" class="text-sm font-semibold text-red-300">{{ notifError }}</p>
+      </div>
+    </section>
+
     <!-- ClickUp -->
     <section class="card reveal p-5" style="animation-delay: 120ms">
       <h2 class="mb-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-mist">
@@ -133,6 +227,7 @@
 
 <script setup lang="ts">
 const api = useApi()
+const router = useRouter()
 const { user, haptic } = useTelegram()
 
 const displayName = computed(() => {
@@ -160,6 +255,70 @@ const setupLoading = ref(false)
 const resetLoading = ref(false)
 const apiToken = ref('')
 const workspaceId = ref('')
+
+// Goal
+const goalLoading = ref(true)
+const goalSaving = ref(false)
+const goalError = ref<string | null>(null)
+const goalSuccess = ref(false)
+const currentGoal = ref(0)
+const newGoalStr = ref('')
+
+// Notifications
+type NotifField =
+  | 'autosync_enabled'
+  | 'notify_daily_digest'
+  | 'notify_weekly'
+  | 'notify_long_timer'
+const notifLoading = ref(true)
+const notifSaving = ref(false)
+const notifError = ref<string | null>(null)
+const notif = ref<Record<string, number | string>>({})
+const digestTime = ref('21:00')
+
+const notifToggles: Array<{ field: NotifField; label: string; hint: string }> = [
+  { field: 'autosync_enabled', label: 'Автосинк ClickUp', hint: 'Фоновая синхронизация времени' },
+  { field: 'notify_daily_digest', label: 'Вечерний дайджест', hint: 'Итоги дня и прогресс к цели' },
+  { field: 'notify_weekly', label: 'Недельная сводка', hint: 'По воскресеньям вечером' },
+  { field: 'notify_long_timer', label: 'Забытый таймер', hint: 'Алерт, если таймер работает слишком долго' }
+]
+
+const saveGoal = async () => {
+  const goal = parseFloat(newGoalStr.value)
+  if (Number.isNaN(goal) || goal < 0) return
+  goalSaving.value = true
+  goalError.value = null
+  goalSuccess.value = false
+  try {
+    await api.put('/user/goal', { goal })
+    currentGoal.value = goal
+    newGoalStr.value = ''
+    goalSuccess.value = true
+    haptic.success()
+    setTimeout(() => (goalSuccess.value = false), 3000)
+  } catch (e: any) {
+    goalError.value = e.message
+    haptic.error()
+  } finally {
+    goalSaving.value = false
+  }
+}
+
+const saveNotif = async (field: string, value: number | string) => {
+  notifSaving.value = true
+  notifError.value = null
+  try {
+    const updated = await api.put('/user/notifications', { [field]: value })
+    notif.value = updated
+    digestTime.value = String(updated.digest_time ?? '21:00')
+    haptic.success()
+  } catch (e: any) {
+    notifError.value = e.message
+    haptic.error()
+  } finally {
+    notifSaving.value = false
+  }
+}
 
 const saveRate = async () => {
   const rate = parseFloat(newRateStr.value)
@@ -222,13 +381,24 @@ const resetClickup = async () => {
 }
 
 onMounted(async () => {
-  const [rateRes, statusRes] = await Promise.all([
+  const [rateRes, statusRes, goalRes, notifRes] = await Promise.all([
     api.get('/user/rate').catch(() => null),
-    api.get('/clickup/status').catch(() => null)
+    api.get('/clickup/status').catch(() => null),
+    api.get('/user/goal').catch(() => null),
+    api.get('/user/notifications').catch(() => null)
   ])
 
   if (rateRes) currentRate.value = rateRes.rate ?? 0
   rateLoading.value = false
+
+  if (goalRes) currentGoal.value = goalRes.goal ?? 0
+  goalLoading.value = false
+
+  if (notifRes) {
+    notif.value = notifRes
+    digestTime.value = String(notifRes.digest_time ?? '21:00')
+  }
+  notifLoading.value = false
 
   if (statusRes?.configured) {
     clickupConfigured.value = true
