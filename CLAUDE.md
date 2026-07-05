@@ -45,6 +45,9 @@ The application follows a single-file architecture with the main `SalaryBot` cla
 - `/yesterday` - Show yesterday's earnings
 - `/week` - Show last 7 days summary
 - `/month` - Show last 30 days summary
+- `/goal [amount]` - Show/set monthly earnings goal (0 clears it); progress appears in `/month`, the daily digest, and the Mini App
+- `/bonus` - Add a bonus payment via FSM (amount → date → comment); bonuses live in the `bonuses` table, are reported as a separate line ("по часам / премии / итого"), and count toward the monthly goal
+- `/bonuses` - List this year's bonuses with inline delete buttons
 - `/help` - Command reference
 
 #### ClickUp Integration
