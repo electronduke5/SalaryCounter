@@ -149,6 +149,93 @@ class DataManager:
                 (user_id,),
             )
 
+    def get_monthly_goal(self, user_id: str) -> float:
+        self.ensure_user(user_id)
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT monthly_goal FROM users WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return row["monthly_goal"] if row else 0.0
+
+    def set_monthly_goal(self, user_id: str, amount: float) -> None:
+        self.ensure_user(user_id)
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET monthly_goal = ? WHERE user_id = ?", (amount, user_id)
+            )
+
+    def add_bonus(self, user_id: str, date: str, amount: float,
+                  comment: Optional[str]) -> int:
+        self.ensure_user(user_id)
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO bonuses (user_id, date, amount, comment, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (user_id, date, amount, comment, datetime.now().isoformat()),
+            )
+            return cur.lastrowid
+
+    def get_bonuses(self, user_id: str, start_date: Optional[str] = None,
+                    end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+        query = "SELECT id, date, amount, comment FROM bonuses WHERE user_id = ?"
+        params: List[Any] = [user_id]
+        if start_date:
+            query += " AND date >= ?"
+            params.append(start_date)
+        if end_date:
+            query += " AND date <= ?"
+            params.append(end_date)
+        query += " ORDER BY date DESC, id DESC"
+        with self._lock:
+            rows = self.conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_bonus(self, user_id: str, bonus_id: int) -> bool:
+        with self._lock:
+            cur = self.conn.execute(
+                "DELETE FROM bonuses WHERE id = ? AND user_id = ?", (bonus_id, user_id)
+            )
+            return cur.rowcount == 1
+
+    def sum_bonuses(self, user_id: str, start_date: str, end_date: str) -> float:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT COALESCE(SUM(amount), 0) FROM bonuses "
+                "WHERE user_id = ? AND date >= ? AND date <= ?",
+                (user_id, start_date, end_date),
+            ).fetchone()
+        return row[0]
+
+    def get_month_progress(self, user_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+        """Прогресс текущего месяца: заработок по часам + премии против цели.
+        Единая точка для бота, API и дайджеста."""
+        now = now or datetime.now()
+        month_prefix = now.strftime("%Y-%m")
+        first_day = f"{month_prefix}-01"
+        if now.month == 12:
+            last_dom = 31
+        else:
+            last_dom = (now.replace(day=1, month=now.month + 1) - timedelta(days=1)).day
+        last_day = f"{month_prefix}-{last_dom:02d}"
+
+        hours_earnings = 0.0
+        for date_str, day in self.get_work_sessions(user_id).items():
+            if date_str.startswith(month_prefix):
+                hours_earnings += day["total_earnings"]
+
+        bonus_earnings = self.sum_bonuses(user_id, first_day, last_day)
+        goal = self.get_monthly_goal(user_id)
+        total = hours_earnings + bonus_earnings
+        return {
+            "hours_earnings": hours_earnings,
+            "bonus_earnings": bonus_earnings,
+            "total": total,
+            "goal": goal,
+            "percent": round(total / goal * 100) if goal > 0 else None,
+            "remaining": max(goal - total, 0) if goal > 0 else None,
+            "days_left": last_dom - now.day,
+        }
+
     def get_users_for_autosync(self) -> List[Dict[str, Any]]:
         """Пользователи с настроенным ClickUp-токеном + их настройки шедулера."""
         with self._lock:
@@ -319,7 +406,8 @@ class DataManager:
         else:
             return f"📊 На этой неделе (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}) нет записей о работе"
 
-    def generate_month_report(self, work_sessions: Dict[str, Any]) -> str:
+    def generate_month_report(self, work_sessions: Dict[str, Any],
+                              bonus_total: float = 0.0, goal: float = 0.0) -> str:
         """Генерация отчета за текущий календарный месяц"""
         today = datetime.now()
         first_day_of_month = today.replace(day=1)
@@ -343,18 +431,34 @@ class DataManager:
                 days_worked += 1
             current_date += timedelta(days=1)
 
-        if days_worked > 0:
-            month_name = today.strftime("%B %Y")
-            return (
-                f"📊 Заработок за {month_name}:\n\n"
-                f"📅 Рабочих дней: {days_worked}\n"
-                f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
-                f"💰 Всего заработано: {total_earnings:.2f} руб\n"
-                f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
-            )
-        else:
-            month_name = today.strftime("%B %Y")
+        month_name = today.strftime("%B %Y")
+        if days_worked == 0 and bonus_total == 0:
             return f"📊 В {month_name} нет записей о работе"
+
+        lines = [f"📊 Заработок за {month_name}:\n"]
+        if days_worked > 0:
+            lines += [
+                f"📅 Рабочих дней: {days_worked}",
+                f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}",
+            ]
+        if bonus_total > 0:
+            lines += [
+                f"💰 Заработано по часам: {total_earnings:.2f} руб",
+                f"🎁 Премии: {bonus_total:.2f} руб",
+                f"💰 Итого: {total_earnings + bonus_total:.2f} руб",
+            ]
+        else:
+            lines.append(f"💰 Всего заработано: {total_earnings:.2f} руб")
+        if days_worked > 0:
+            lines.append(f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб")
+        if goal > 0:
+            total = total_earnings + bonus_total
+            percent = round(total / goal * 100)
+            remaining = max(goal - total, 0)
+            lines.append(
+                f"🎯 Цель: {goal:.0f} руб — {percent}% (осталось {remaining:.0f} руб)"
+            )
+        return "\n".join(lines)
 
     def generate_week_details_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация детального отчета за неделю"""
