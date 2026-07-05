@@ -32,6 +32,10 @@ class SalaryStates(StatesGroup):
     waiting_for_clickup_token = State()
     waiting_for_workspace_id = State()
     waiting_for_digest_time = State()
+    waiting_for_goal = State()
+    waiting_for_bonus_amount = State()
+    waiting_for_bonus_date = State()
+    waiting_for_bonus_comment = State()
 
 
 NOTIF_TOGGLE_FIELDS = {
@@ -40,6 +44,17 @@ NOTIF_TOGGLE_FIELDS = {
     "timer": "notify_long_timer",
     "autosync": "autosync_enabled",
 }
+
+
+def parse_bonus_date(value: str) -> Optional[str]:
+    """ДД.ММ.ГГГГ или ГГГГ-ММ-ДД → 'YYYY-MM-DD'; None, если не дата."""
+    value = (value or "").strip()
+    for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
 
 
 def valid_hhmm(value: str) -> bool:
@@ -501,6 +516,55 @@ class SalaryBot:
             parse_mode="Markdown"
         )
 
+    def month_report_with_bonuses(self, user_id: str) -> str:
+        """Месячный отчёт с премиями и целью (единый для /month и inline-кнопок)."""
+        progress = self.data_manager.get_month_progress(user_id)
+        return self.data_manager.generate_month_report(
+            self.data_manager.get_work_sessions(user_id),
+            bonus_total=progress["bonus_earnings"],
+            goal=progress["goal"],
+        )
+
+    async def _set_goal_from_text(self, message: Message, user_id: str, text: str) -> bool:
+        try:
+            goal = float(text.strip().replace(",", "."))
+        except ValueError:
+            await message.answer("❌ Введите число, например 250000")
+            return False
+        if goal < 0:
+            await message.answer("❌ Цель не может быть отрицательной")
+            return False
+        self.data_manager.set_monthly_goal(user_id, goal)
+        if goal == 0:
+            await message.answer("✅ Цель месяца убрана")
+        else:
+            progress = self.data_manager.get_month_progress(user_id)
+            await message.answer(
+                f"✅ Цель месяца: {goal:.0f} руб\n"
+                f"💰 Уже набрано: {progress['total']:.0f} руб ({progress['percent']}%)"
+            )
+        return True
+
+    async def _ask_bonus_comment(self, message: Message, state: FSMContext):
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="⏭ Пропустить", callback_data="bonus_skip_comment")
+        ]])
+        await message.answer("💬 Комментарий к премии (например, «Q2»):", reply_markup=keyboard)
+        await state.set_state(SalaryStates.waiting_for_bonus_comment)
+
+    async def _save_bonus(self, message: Message, user_id: str, state: FSMContext,
+                          comment: Optional[str]):
+        data = await state.get_data()
+        amount, date_str = data["bonus_amount"], data["bonus_date"]
+        self.data_manager.add_bonus(user_id, date_str, amount, comment)
+        await state.clear()
+        date_h = datetime.strptime(date_str, "%Y-%m-%d").strftime("%d.%m.%Y")
+        comment_line = f"\n💬 {comment}" if comment else ""
+        await message.answer(
+            f"✅ Премия добавлена: {amount:.0f} руб, {date_h}{comment_line}\n\n"
+            f"Список премий: /bonuses"
+        )
+
     def setup_handlers(self):
         """Настройка обработчиков команд"""
 
@@ -561,6 +625,9 @@ class SalaryBot:
                 "🏠 Основные команды:\n"
                 "/start - главное меню\n"
                 "/setrate - установить ставку (руб/час)\n"
+                "/goal [сумма] - цель заработка на месяц\n"
+                "/bonus - добавить премию\n"
+                "/bonuses - список премий за год\n"
                 "/today - заработок за сегодня\n"
                 "/yesterday - заработок за вчера\n"
                 "/week - заработок за неделю (с понедельника)\n"
@@ -613,6 +680,120 @@ class SalaryBot:
 
             except ValueError:
                 await message.answer("❌ Пожалуйста, введите корректное число!")
+
+        @self.dp.message(Command("goal"))
+        async def goal_command(message: Message, state: FSMContext):
+            user_id = str(message.from_user.id)
+            parts = (message.text or "").split(maxsplit=1)
+            if len(parts) == 2:
+                await self._set_goal_from_text(message, user_id, parts[1])
+                return
+            progress = self.data_manager.get_month_progress(user_id)
+            if progress["goal"] > 0:
+                await message.answer(
+                    f"🎯 Цель месяца: {progress['goal']:.0f} руб\n"
+                    f"💰 Набрано: {progress['total']:.0f} руб ({progress['percent']}%)\n"
+                    f"⏳ Осталось: {progress['remaining']:.0f} руб, "
+                    f"дней до конца месяца: {progress['days_left']}\n\n"
+                    "Введите новую цель в рублях (0 — убрать цель):"
+                )
+            else:
+                await message.answer("🎯 Цель месяца не задана.\nВведите цель в рублях:")
+            await state.set_state(SalaryStates.waiting_for_goal)
+
+        @self.dp.message(SalaryStates.waiting_for_goal)
+        async def process_goal(message: Message, state: FSMContext):
+            user_id = str(message.from_user.id)
+            if await self._set_goal_from_text(message, user_id, message.text or ""):
+                await state.clear()
+
+        @self.dp.message(Command("bonus"))
+        async def bonus_command(message: Message, state: FSMContext):
+            await message.answer("🎁 Введите сумму премии в рублях:")
+            await state.set_state(SalaryStates.waiting_for_bonus_amount)
+
+        @self.dp.message(SalaryStates.waiting_for_bonus_amount)
+        async def process_bonus_amount(message: Message, state: FSMContext):
+            try:
+                amount = float((message.text or "").replace(",", "."))
+            except ValueError:
+                await message.answer("❌ Введите число, например 30000")
+                return
+            if amount <= 0:
+                await message.answer("❌ Сумма должна быть положительной")
+                return
+            await state.update_data(bonus_amount=amount)
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="📅 Сегодня", callback_data="bonus_date_today")
+            ]])
+            await message.answer(
+                "📅 Введите дату премии (ДД.ММ.ГГГГ) или нажмите кнопку:",
+                reply_markup=keyboard,
+            )
+            await state.set_state(SalaryStates.waiting_for_bonus_date)
+
+        @self.dp.callback_query(F.data == "bonus_date_today", SalaryStates.waiting_for_bonus_date)
+        async def bonus_date_today(callback: CallbackQuery, state: FSMContext):
+            await state.update_data(bonus_date=datetime.now().strftime("%Y-%m-%d"))
+            await self._ask_bonus_comment(callback.message, state)
+            await callback.answer()
+
+        @self.dp.message(SalaryStates.waiting_for_bonus_date)
+        async def process_bonus_date(message: Message, state: FSMContext):
+            date_str = parse_bonus_date(message.text or "")
+            if not date_str:
+                await message.answer("❌ Неверная дата. Формат: ДД.ММ.ГГГГ, например 05.07.2026")
+                return
+            await state.update_data(bonus_date=date_str)
+            await self._ask_bonus_comment(message, state)
+
+        @self.dp.callback_query(F.data == "bonus_skip_comment", SalaryStates.waiting_for_bonus_comment)
+        async def bonus_skip_comment(callback: CallbackQuery, state: FSMContext):
+            await self._save_bonus(callback.message, str(callback.from_user.id), state, None)
+            await callback.answer()
+
+        @self.dp.message(SalaryStates.waiting_for_bonus_comment)
+        async def process_bonus_comment(message: Message, state: FSMContext):
+            comment = (message.text or "").strip() or None
+            await self._save_bonus(message, str(message.from_user.id), state, comment)
+
+        @self.dp.message(Command("bonuses"))
+        async def bonuses_command(message: Message):
+            user_id = str(message.from_user.id)
+            year = datetime.now().year
+            bonuses = self.data_manager.get_bonuses(
+                user_id, start_date=f"{year}-01-01", end_date=f"{year}-12-31"
+            )
+            if not bonuses:
+                await message.answer(f"🎁 В {year} году премий пока нет. Добавить: /bonus")
+                return
+            total = sum(b["amount"] for b in bonuses)
+            lines = [f"🎁 Премии за {year} год (итого {total:.0f} руб):\n"]
+            keyboard_rows = []
+            for b in bonuses:
+                date_h = datetime.strptime(b["date"], "%Y-%m-%d").strftime("%d.%m.%Y")
+                comment = f" — {b['comment']}" if b["comment"] else ""
+                lines.append(f"• {date_h}: {b['amount']:.0f} руб{comment}")
+                keyboard_rows.append([InlineKeyboardButton(
+                    text=f"🗑 Удалить {date_h} ({b['amount']:.0f} руб)",
+                    callback_data=f"bonus_del_{b['id']}",
+                )])
+            await message.answer(
+                "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_rows),
+            )
+
+        @self.dp.callback_query(F.data.startswith("bonus_del_"))
+        async def bonus_delete_callback(callback: CallbackQuery):
+            user_id = str(callback.from_user.id)
+            bonus_id = int(callback.data.removeprefix("bonus_del_"))
+            if self.data_manager.delete_bonus(user_id, bonus_id):
+                await callback.answer("Премия удалена")
+                await callback.message.edit_text(
+                    callback.message.text + "\n\n🗑 Премия удалена. Обновить список: /bonuses"
+                )
+            else:
+                await callback.answer("Премия не найдена", show_alert=True)
 
         @self.dp.message(Command("notifications"))
         async def notifications_command(message: Message):
@@ -1015,8 +1196,7 @@ class SalaryBot:
         @self.dp.message(Command("month"))
         async def month_command(message: Message):
             user_id = str(message.from_user.id)
-            content = self.data_manager.generate_month_report(
-                self.data_manager.get_work_sessions(user_id))
+            content = self.month_report_with_bonuses(user_id)
             await self.send_earnings_report(message, "month", content)
 
         @self.dp.message(Command("monthweeks"))
@@ -1727,8 +1907,7 @@ class SalaryBot:
         @self.dp.callback_query(F.data == "earnings_month")
         async def handle_earnings_month(callback: CallbackQuery):
             user_id = str(callback.from_user.id)
-            content = self.data_manager.generate_month_report(
-                self.data_manager.get_work_sessions(user_id))
+            content = self.month_report_with_bonuses(user_id)
 
             keyboard = self.create_earnings_keyboard("month")
             await callback.message.edit_text(content, reply_markup=keyboard)

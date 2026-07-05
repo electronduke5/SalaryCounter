@@ -26,6 +26,14 @@ def test_notif_toggle_field_map():
     assert main.NOTIF_TOGGLE_FIELDS["autosync"] == "autosync_enabled"
 
 
+def test_parse_bonus_date():
+    assert main.parse_bonus_date("05.07.2026") == "2026-07-05"
+    assert main.parse_bonus_date("2026-07-05") == "2026-07-05"
+    assert main.parse_bonus_date("31.02.2026") is None
+    assert main.parse_bonus_date("вчера") is None
+    assert main.parse_bonus_date("") is None
+
+
 def test_valid_hhmm():
     assert main.valid_hhmm("21:00") is True
     assert main.valid_hhmm("9:05") is True
