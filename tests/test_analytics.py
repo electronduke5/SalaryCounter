@@ -67,12 +67,22 @@ def test_hours_norm_stats(dm):
     _add(dm, "42", "2026-07-01", 8, 8000)
     _add(dm, "42", "2026-07-02", 8, 8000, entry="d2")
 
-    # 5 июля из 31 дня месяца
+    # Темп — по рабочим дням (пн–пт), выходные не считаются.
+    # Июль 2026: 23 рабочих дня; к 5 июля (воскресенье) прошло 3 (ср 1, чт 2, пт 3).
     stats = dm.get_hours_norm_stats("42", now=datetime(2026, 7, 5))
     assert stats["norm"] == 160
     assert stats["actual_hours"] == 16
-    assert stats["expected_by_today"] == pytest.approx(160 * 5 / 31)
-    assert stats["diff"] == pytest.approx(16 - 160 * 5 / 31)
+    assert stats["expected_by_today"] == pytest.approx(160 * 3 / 23)
+    assert stats["diff"] == pytest.approx(16 - 160 * 3 / 23)
+
+    # В понедельник 6 июля прошло 4 рабочих дня (включая сегодня)
+    stats = dm.get_hours_norm_stats("42", now=datetime(2026, 7, 6))
+    assert stats["expected_by_today"] == pytest.approx(160 * 4 / 23)
+
+    # Суббота 4 июля не добавляет рабочих дней относительно пятницы
+    fri = dm.get_hours_norm_stats("42", now=datetime(2026, 7, 3))
+    sat = dm.get_hours_norm_stats("42", now=datetime(2026, 7, 4))
+    assert sat["expected_by_today"] == fri["expected_by_today"]
 
 
 def test_hours_norm_stats_without_norm(dm):

@@ -307,22 +307,35 @@ class DataManager:
         items.sort(key=lambda i: i["earnings"], reverse=True)
         return items
 
+    @staticmethod
+    def _working_days(year: int, month: int, up_to_day: Optional[int] = None) -> int:
+        """Число рабочих дней (пн–пт) в месяце; up_to_day — включительно до этого числа."""
+        if month == 12:
+            last = 31
+        else:
+            last = (datetime(year, month + 1, 1) - timedelta(days=1)).day
+        last = min(last, up_to_day) if up_to_day else last
+        return sum(
+            1 for d in range(1, last + 1) if datetime(year, month, d).weekday() < 5
+        )
+
     def get_hours_norm_stats(self, user_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
-        """Норма часов месяца против факта; expected_by_today — норма × прошедшая доля месяца."""
+        """Норма часов месяца против факта; expected_by_today — норма × доля
+        прошедших рабочих дней (пн–пт), выходные темп не двигают."""
         now = now or datetime.now()
         norm = self.get_hours_norm(user_id)
         month_prefix = now.strftime("%Y-%m")
-        if now.month == 12:
-            days_in_month = 31
-        else:
-            days_in_month = (now.replace(day=1, month=now.month + 1) - timedelta(days=1)).day
 
         actual_hours = 0.0
         for date_str, day in self.get_work_sessions(user_id).items():
             if date_str.startswith(month_prefix):
                 actual_hours += day["total_hours"]
 
-        expected = norm * now.day / days_in_month if norm > 0 else None
+        expected = None
+        if norm > 0:
+            total_wd = self._working_days(now.year, now.month)
+            passed_wd = self._working_days(now.year, now.month, up_to_day=now.day)
+            expected = norm * passed_wd / total_wd if total_wd else 0.0
         return {
             "norm": norm,
             "actual_hours": actual_hours,
