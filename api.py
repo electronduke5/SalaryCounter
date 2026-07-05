@@ -117,6 +117,25 @@ class TaskStatusUpdate(BaseModel):
     status: str
 
 
+class GoalUpdate(BaseModel):
+    goal: float
+
+
+class BonusCreate(BaseModel):
+    date: str
+    amount: float
+    comment: Optional[str] = None
+
+
+class NotificationSettingsUpdate(BaseModel):
+    notify_daily_digest: Optional[int] = None
+    digest_time: Optional[str] = None
+    notify_weekly: Optional[int] = None
+    notify_long_timer: Optional[int] = None
+    long_timer_hours: Optional[float] = None
+    autosync_enabled: Optional[int] = None
+
+
 # ---------------------------------------------------------------------------
 # App lifespan: run bot + API in same process
 # ---------------------------------------------------------------------------
@@ -124,6 +143,7 @@ class TaskStatusUpdate(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     bot_task = None
+    scheduler_task = None
     try:
         if BOT_TOKEN:
             from main import SalaryBot
@@ -132,17 +152,23 @@ async def lifespan(app: FastAPI):
             salary_bot.data_manager = data_manager
             bot_task = asyncio.create_task(salary_bot.start_bot())
             logger.info("Bot polling started")
+
+            if os.getenv("SCHEDULER_ENABLED", "1") == "1":
+                from scheduler import BackgroundScheduler
+                scheduler = BackgroundScheduler(data_manager, salary_bot.bot)
+                scheduler_task = asyncio.create_task(scheduler.run())
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
 
     yield
 
-    if bot_task:
-        bot_task.cancel()
-        try:
-            await bot_task
-        except asyncio.CancelledError:
-            pass
+    for task in (scheduler_task, bot_task):
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(title="SalaryCounter API", lifespan=lifespan)
@@ -185,6 +211,76 @@ async def update_rate(body: RateUpdate, user_id: str = Depends(get_current_user)
         raise HTTPException(status_code=400, detail="Rate must be positive")
     data_manager.set_rate(user_id, body.rate)
     return {"rate": body.rate}
+
+
+@api.get("/user/goal")
+async def get_goal(user_id: str = Depends(get_current_user)):
+    return {
+        "goal": data_manager.get_monthly_goal(user_id),
+        "progress": data_manager.get_month_progress(user_id),
+    }
+
+
+@api.put("/user/goal")
+async def update_goal(body: GoalUpdate, user_id: str = Depends(get_current_user)):
+    if body.goal < 0:
+        raise HTTPException(status_code=400, detail="Goal must be non-negative")
+    data_manager.set_monthly_goal(user_id, body.goal)
+    return {"goal": body.goal}
+
+
+@api.get("/bonuses")
+async def list_bonuses(year: Optional[int] = None,
+                       user_id: str = Depends(get_current_user)):
+    if year:
+        bonuses = data_manager.get_bonuses(
+            user_id, start_date=f"{year}-01-01", end_date=f"{year}-12-31")
+    else:
+        bonuses = data_manager.get_bonuses(user_id)
+    return {"bonuses": bonuses, "total": sum(b["amount"] for b in bonuses)}
+
+
+@api.post("/bonuses")
+async def create_bonus(body: BonusCreate, user_id: str = Depends(get_current_user)):
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    try:
+        datetime.strptime(body.date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Date must be YYYY-MM-DD")
+    bonus_id = data_manager.add_bonus(user_id, body.date, body.amount, body.comment)
+    return {"id": bonus_id}
+
+
+@api.delete("/bonuses/{bonus_id}")
+async def delete_bonus(bonus_id: int, user_id: str = Depends(get_current_user)):
+    if not data_manager.delete_bonus(user_id, bonus_id):
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    return {"deleted": True}
+
+
+def _valid_hhmm(value: str) -> bool:
+    parts = value.split(":")
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        return False
+    return 0 <= int(parts[0]) <= 23 and 0 <= int(parts[1]) <= 59
+
+
+@api.get("/user/notifications")
+async def get_notification_settings(user_id: str = Depends(get_current_user)):
+    return data_manager.get_notification_settings(user_id)
+
+
+@api.put("/user/notifications")
+async def update_notification_settings(body: NotificationSettingsUpdate,
+                                       user_id: str = Depends(get_current_user)):
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "digest_time" in fields and not _valid_hhmm(fields["digest_time"]):
+        raise HTTPException(status_code=400, detail="digest_time must be HH:MM")
+    if "long_timer_hours" in fields and fields["long_timer_hours"] <= 0:
+        raise HTTPException(status_code=400, detail="long_timer_hours must be positive")
+    data_manager.set_notification_settings(user_id, **fields)
+    return data_manager.get_notification_settings(user_id)
 
 
 def _sum_sessions(work_sessions: dict, start_date: datetime, end_date: datetime) -> dict:
@@ -340,12 +436,17 @@ async def earnings_month(user_id: str = Depends(get_current_user)):
     total_earnings = sum(d["total_earnings"] for d in days)
     prev_month_last = first - timedelta(days=1)
     prev_month_first = prev_month_last.replace(day=1)
+    progress = data_manager.get_month_progress(user_id, now=today)
     return {
         "period_start": first.strftime("%Y-%m-%d"),
         "period_end": today.strftime("%Y-%m-%d"),
         "days": days,
         "total_hours": total_hours,
         "total_earnings": total_earnings,
+        "bonus_earnings": progress["bonus_earnings"],
+        "total_with_bonuses": total_earnings + progress["bonus_earnings"],
+        "goal": progress["goal"],
+        "goal_percent": progress["percent"],
         "previous": _previous(
             work_sessions,
             prev_month_first,
@@ -592,13 +693,8 @@ async def stop_timer(user_id: str = Depends(get_current_user)):
     return {"success": True}
 
 
-@api.get("/analytics/tasks")
-async def analytics_tasks(
-    period: str = "week",
-    start: Optional[str] = None,
-    end: Optional[str] = None,
-    user_id: str = Depends(get_current_user),
-):
+def _resolve_period(period: str, start: Optional[str], end: Optional[str]) -> tuple:
+    """Разбор периода (preset или произвольный start/end) → (start_date, end_date, period, period_name)."""
     # A custom range (start/end) takes precedence over the named preset.
     if start and end:
         try:
@@ -615,12 +711,23 @@ async def analytics_tasks(
                 end_date.replace(hour=0, minute=0, second=0, microsecond=0),
                 start_date.replace(hour=23, minute=59, second=59, microsecond=0),
             )
-        period = "custom"
         period_name = f"{start_date.strftime('%d.%m.%Y')} — {end_date.strftime('%d.%m.%Y')}"
-    else:
-        # The webapp sends "7"/"30"; map them to the keys get_tasks_summary_by_period understands.
-        period_key = {"7": "7days", "30": "30days"}.get(period, period)
-        start_date, end_date, period_name = data_manager.get_tasks_summary_by_period(period_key)
+        return start_date, end_date, "custom", period_name
+
+    # The webapp sends "7"/"30"; map them to the keys get_tasks_summary_by_period understands.
+    period_key = {"7": "7days", "30": "30days"}.get(period, period)
+    start_date, end_date, period_name = data_manager.get_tasks_summary_by_period(period_key)
+    return start_date, end_date, period, period_name
+
+
+@api.get("/analytics/tasks")
+async def analytics_tasks(
+    period: str = "week",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    user_id: str = Depends(get_current_user),
+):
+    start_date, end_date, period, period_name = _resolve_period(period, start, end)
 
     summary = data_manager.get_tasks_summary(user_id, start_date, end_date)
 
@@ -657,6 +764,51 @@ async def analytics_tasks(
         "total_tasks": summary["total_tasks"],
         "total_sessions": summary["total_sessions"],
     }
+
+
+@api.get("/analytics/heatmap")
+async def analytics_heatmap(year: Optional[int] = None,
+                            user_id: str = Depends(get_current_user)):
+    year = year or datetime.now().year
+    return {"year": year, "days": data_manager.get_activity_heatmap(user_id, year)}
+
+
+@api.get("/analytics/projects")
+async def analytics_projects(
+    period: str = "month",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    user_id: str = Depends(get_current_user),
+):
+    start_date, end_date, period, period_name = _resolve_period(period, start, end)
+    projects = data_manager.get_projects_breakdown(user_id, start_date, end_date)
+    return {
+        "period": period,
+        "period_name": period_name,
+        "period_start": start_date.isoformat(),
+        "period_end": end_date.isoformat(),
+        "projects": projects,
+        "total_hours": sum(p["hours"] for p in projects),
+        "total_earnings": sum(p["earnings"] for p in projects),
+    }
+
+
+@api.get("/analytics/norm")
+async def analytics_norm(user_id: str = Depends(get_current_user)):
+    return data_manager.get_hours_norm_stats(user_id)
+
+
+class HoursNormUpdate(BaseModel):
+    hours: float
+
+
+@api.put("/user/hours-norm")
+async def update_hours_norm(body: HoursNormUpdate,
+                            user_id: str = Depends(get_current_user)):
+    if body.hours < 0:
+        raise HTTPException(status_code=400, detail="Hours norm must be non-negative")
+    data_manager.set_hours_norm(user_id, body.hours)
+    return {"hours": body.hours}
 
 
 # Mount the API under /api/v1

@@ -45,6 +45,9 @@ The application follows a single-file architecture with the main `SalaryBot` cla
 - `/yesterday` - Show yesterday's earnings
 - `/week` - Show last 7 days summary
 - `/month` - Show last 30 days summary
+- `/goal [amount]` - Show/set monthly earnings goal (0 clears it); progress appears in `/month`, the daily digest, and the Mini App
+- `/bonus` - Add a bonus payment via FSM (amount → date → comment); bonuses live in the `bonuses` table, are reported as a separate line ("по часам / премии / итого"), and count toward the monthly goal
+- `/bonuses` - List this year's bonuses with inline delete buttons
 - `/help` - Command reference
 
 #### ClickUp Integration
@@ -54,6 +57,10 @@ The application follows a single-file architecture with the main `SalaryBot` cla
 - `/syncclickup` - Sync today's time entries
 - `/synclast [days]` - Sync last N days (default 7)
 - `/clickupstatus` - Show integration status and active timers
+- `/notifications` - Toggle background autosync and notifications (daily digest, weekly summary, long-timer alert), set digest time
+
+#### Background Scheduler
+`scheduler.py` runs inside the same process (started from the `api.py` lifespan, gated by `SCHEDULER_ENABLED`). It periodically autosyncs ClickUp entries for every user with a configured token and sends notifications according to per-user settings stored in `users` columns. Sent notifications are deduplicated via the `notification_log` table, so restarts never re-send a digest. Timing envs: `SCHEDULER_TICK_SECONDS`, `AUTOSYNC_INTERVAL_MINUTES`, `TIMER_CHECK_INTERVAL_MINUTES`, `APP_TZ`.
 
 #### Task Management
 - `/tasks` - Step-by-step task navigation: Projects → Status → Tasks with interactive controls

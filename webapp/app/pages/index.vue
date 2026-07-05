@@ -29,6 +29,14 @@
         />
       </HeroEarnings>
 
+      <!-- Monthly goal progress -->
+      <GoalProgress
+        v-if="goalProgress && goalProgress.goal > 0"
+        class="reveal"
+        style="animation-delay: 40ms"
+        :progress="goalProgress"
+      />
+
       <!-- Active timer -->
       <TimerCard
         v-if="activeTimer"
@@ -103,6 +111,7 @@ const error = ref<string | null>(null)
 const today = ref({ date: '', total_hours: 0, total_earnings: 0, sessions: [] as any[] })
 const weekDays = ref<any[]>([])
 const activeTimer = ref<any>(null)
+const goalProgress = ref<any>(null)
 const selectedDate = ref('')
 
 const greeting = computed(() =>
@@ -175,15 +184,17 @@ const stopTimer = async () => {
 }
 
 const loadData = async () => {
-  const [todayData, statusData, weekData] = await Promise.all([
+  const [todayData, statusData, weekData, goalData] = await Promise.all([
     api.get('/earnings/today'),
     api.get('/clickup/status').catch(() => null),
-    api.get('/earnings/week').catch(() => null)
+    api.get('/earnings/week').catch(() => null),
+    api.get('/user/goal').catch(() => null)
   ])
   today.value = todayData
   selectedDate.value = todayData.date
   weekDays.value = weekData?.days ?? []
   activeTimer.value = statusData?.active_timer ?? null
+  goalProgress.value = goalData?.progress ?? null
 }
 
 const quickSyncToday = async () => {

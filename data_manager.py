@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 
 import crypto
 import db
+import production_calendar
 from clickup_client import ClickUpClient
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,11 @@ DB_FILE = "salary.db"
 MS_PER_HOUR = 3_600_000
 
 _CLICKUP_KEYS = ("api_token", "workspace_id", "team_id", "user_id", "username")
+
+_NOTIFICATION_COLUMNS = (
+    "notify_daily_digest", "digest_time", "notify_weekly",
+    "notify_long_timer", "long_timer_hours", "autosync_enabled",
+)
 
 
 class DataManager:
@@ -144,6 +150,245 @@ class DataManager:
                 (user_id,),
             )
 
+    def get_monthly_goal(self, user_id: str) -> float:
+        self.ensure_user(user_id)
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT monthly_goal FROM users WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return row["monthly_goal"] if row else 0.0
+
+    def set_monthly_goal(self, user_id: str, amount: float) -> None:
+        self.ensure_user(user_id)
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET monthly_goal = ? WHERE user_id = ?", (amount, user_id)
+            )
+
+    def add_bonus(self, user_id: str, date: str, amount: float,
+                  comment: Optional[str]) -> int:
+        self.ensure_user(user_id)
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO bonuses (user_id, date, amount, comment, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (user_id, date, amount, comment, datetime.now().isoformat()),
+            )
+            return cur.lastrowid
+
+    def get_bonuses(self, user_id: str, start_date: Optional[str] = None,
+                    end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+        query = "SELECT id, date, amount, comment FROM bonuses WHERE user_id = ?"
+        params: List[Any] = [user_id]
+        if start_date:
+            query += " AND date >= ?"
+            params.append(start_date)
+        if end_date:
+            query += " AND date <= ?"
+            params.append(end_date)
+        query += " ORDER BY date DESC, id DESC"
+        with self._lock:
+            rows = self.conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_bonus(self, user_id: str, bonus_id: int) -> bool:
+        with self._lock:
+            cur = self.conn.execute(
+                "DELETE FROM bonuses WHERE id = ? AND user_id = ?", (bonus_id, user_id)
+            )
+            return cur.rowcount == 1
+
+    def sum_bonuses(self, user_id: str, start_date: str, end_date: str) -> float:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT COALESCE(SUM(amount), 0) FROM bonuses "
+                "WHERE user_id = ? AND date >= ? AND date <= ?",
+                (user_id, start_date, end_date),
+            ).fetchone()
+        return row[0]
+
+    def get_month_progress(self, user_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+        """Прогресс текущего месяца: заработок по часам + премии против цели.
+        Единая точка для бота, API и дайджеста."""
+        now = now or datetime.now()
+        month_prefix = now.strftime("%Y-%m")
+        first_day = f"{month_prefix}-01"
+        if now.month == 12:
+            last_dom = 31
+        else:
+            last_dom = (now.replace(day=1, month=now.month + 1) - timedelta(days=1)).day
+        last_day = f"{month_prefix}-{last_dom:02d}"
+
+        hours_earnings = 0.0
+        for date_str, day in self.get_work_sessions(user_id).items():
+            if date_str.startswith(month_prefix):
+                hours_earnings += day["total_earnings"]
+
+        bonus_earnings = self.sum_bonuses(user_id, first_day, last_day)
+        goal = self.get_monthly_goal(user_id)
+        total = hours_earnings + bonus_earnings
+        return {
+            "hours_earnings": hours_earnings,
+            "bonus_earnings": bonus_earnings,
+            "total": total,
+            "goal": goal,
+            "percent": round(total / goal * 100) if goal > 0 else None,
+            "remaining": max(goal - total, 0) if goal > 0 else None,
+            "days_left": last_dom - now.day,
+        }
+
+    def get_hours_norm(self, user_id: str) -> float:
+        self.ensure_user(user_id)
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT monthly_hours_norm FROM users WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return row["monthly_hours_norm"] if row else 0.0
+
+    def set_hours_norm(self, user_id: str, hours: float) -> None:
+        self.ensure_user(user_id)
+        with self._lock:
+            self.conn.execute(
+                "UPDATE users SET monthly_hours_norm = ? WHERE user_id = ?",
+                (hours, user_id),
+            )
+
+    @staticmethod
+    def _heatmap_level(hours: float) -> int:
+        if hours <= 0:
+            return 0
+        if hours < 2:
+            return 1
+        if hours < 4:
+            return 2
+        if hours < 6:
+            return 3
+        return 4
+
+    def get_activity_heatmap(self, user_id: str, year: int) -> List[Dict[str, Any]]:
+        """Дни года с активностью: часы, заработок и уровень интенсивности 0–4."""
+        prefix = f"{year}-"
+        out = []
+        for date_str, day in sorted(self.get_work_sessions(user_id).items()):
+            if not date_str.startswith(prefix):
+                continue
+            hours = day["total_hours"]
+            out.append({
+                "date": date_str,
+                "hours": hours,
+                "earnings": day["total_earnings"],
+                "level": self._heatmap_level(hours),
+            })
+        return out
+
+    def get_projects_breakdown(self, user_id: str, start_date: datetime,
+                               end_date: datetime) -> List[Dict[str, Any]]:
+        """Время/деньги по проектам за период, сортировка по заработку."""
+        start = start_date.strftime("%Y-%m-%d")
+        end = end_date.strftime("%Y-%m-%d")
+        totals: Dict[str, Dict[str, float]] = {}
+        for date_str, day in self.get_work_sessions(user_id).items():
+            if not (start <= date_str <= end):
+                continue
+            for session in day["sessions"]:
+                name = session.get("project_name") or "Без проекта"
+                agg = totals.setdefault(name, {"hours": 0.0, "earnings": 0.0})
+                agg["hours"] += session["duration_hours"]
+                agg["earnings"] += session["earnings"]
+        grand_total = sum(v["earnings"] for v in totals.values())
+        items = [
+            {
+                "project_name": name,
+                "hours": v["hours"],
+                "earnings": v["earnings"],
+                "share": v["earnings"] / grand_total if grand_total > 0 else 0,
+            }
+            for name, v in totals.items()
+        ]
+        items.sort(key=lambda i: i["earnings"], reverse=True)
+        return items
+
+    @staticmethod
+    def _working_days(year: int, month: int, up_to_day: Optional[int] = None) -> int:
+        """Число рабочих дней в месяце по производственному календарю РФ."""
+        return production_calendar.working_days_in_month(year, month, up_to_day)
+
+    def get_hours_norm_stats(self, user_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+        """Норма часов месяца против факта; expected_by_today — норма × доля
+        прошедших рабочих дней по производственному календарю РФ
+        (выходные и праздники темп не двигают)."""
+        now = now or datetime.now()
+        norm = self.get_hours_norm(user_id)
+        month_prefix = now.strftime("%Y-%m")
+
+        actual_hours = 0.0
+        for date_str, day in self.get_work_sessions(user_id).items():
+            if date_str.startswith(month_prefix):
+                actual_hours += day["total_hours"]
+
+        expected = None
+        if norm > 0:
+            total_wd = self._working_days(now.year, now.month)
+            passed_wd = self._working_days(now.year, now.month, up_to_day=now.day)
+            expected = norm * passed_wd / total_wd if total_wd else 0.0
+        return {
+            "norm": norm,
+            "actual_hours": actual_hours,
+            "expected_by_today": expected,
+            "diff": actual_hours - expected if expected is not None else None,
+        }
+
+    def get_users_for_autosync(self) -> List[Dict[str, Any]]:
+        """Пользователи с настроенным ClickUp-токеном + их настройки шедулера."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT user_id, rate, autosync_enabled, notify_daily_digest, "
+                "digest_time, notify_weekly, notify_long_timer, long_timer_hours "
+                "FROM users WHERE clickup_api_token IS NOT NULL"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_notification_settings(self, user_id: str) -> Dict[str, Any]:
+        self.ensure_user(user_id)
+        with self._lock:
+            row = self.conn.execute(
+                f"SELECT {', '.join(_NOTIFICATION_COLUMNS)} FROM users WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return dict(row)
+
+    def set_notification_settings(self, user_id: str, **fields) -> None:
+        self.ensure_user(user_id)
+        assignments, values = [], []
+        for key, value in fields.items():
+            if key not in _NOTIFICATION_COLUMNS:
+                continue
+            assignments.append(f"{key} = ?")
+            values.append(value)
+        if not assignments:
+            return
+        values.append(user_id)
+        with self._lock:
+            self.conn.execute(
+                f"UPDATE users SET {', '.join(assignments)} WHERE user_id = ?", values
+            )
+
+    def was_notified(self, user_id: str, kind: str, ref: str) -> bool:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT 1 FROM notification_log WHERE user_id = ? AND kind = ? AND ref = ?",
+                (user_id, kind, ref),
+            ).fetchone()
+        return row is not None
+
+    def mark_notified(self, user_id: str, kind: str, ref: str) -> None:
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO notification_log (user_id, kind, ref, sent_at) "
+                "VALUES (?, ?, ?, ?)",
+                (user_id, kind, ref, datetime.now().isoformat()),
+            )
+
     def add_synced_session(self, user_id: str, entry_id: str, date: str,
                            session: Dict[str, Any]) -> bool:
         """Атомарно: пометить запись синхронизированной И вставить сессию.
@@ -263,7 +508,8 @@ class DataManager:
         else:
             return f"📊 На этой неделе (с {monday.strftime('%d.%m')} по {today.strftime('%d.%m')}) нет записей о работе"
 
-    def generate_month_report(self, work_sessions: Dict[str, Any]) -> str:
+    def generate_month_report(self, work_sessions: Dict[str, Any],
+                              bonus_total: float = 0.0, goal: float = 0.0) -> str:
         """Генерация отчета за текущий календарный месяц"""
         today = datetime.now()
         first_day_of_month = today.replace(day=1)
@@ -287,18 +533,34 @@ class DataManager:
                 days_worked += 1
             current_date += timedelta(days=1)
 
-        if days_worked > 0:
-            month_name = today.strftime("%B %Y")
-            return (
-                f"📊 Заработок за {month_name}:\n\n"
-                f"📅 Рабочих дней: {days_worked}\n"
-                f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}\n"
-                f"💰 Всего заработано: {total_earnings:.2f} руб\n"
-                f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб"
-            )
-        else:
-            month_name = today.strftime("%B %Y")
+        month_name = today.strftime("%B %Y")
+        if days_worked == 0 and bonus_total == 0:
             return f"📊 В {month_name} нет записей о работе"
+
+        lines = [f"📊 Заработок за {month_name}:\n"]
+        if days_worked > 0:
+            lines += [
+                f"📅 Рабочих дней: {days_worked}",
+                f"⏰ Всего отработано: {self.format_hours_minutes(total_hours)}",
+            ]
+        if bonus_total > 0:
+            lines += [
+                f"💰 Заработано по часам: {total_earnings:.2f} руб",
+                f"🎁 Премии: {bonus_total:.2f} руб",
+                f"💰 Итого: {total_earnings + bonus_total:.2f} руб",
+            ]
+        else:
+            lines.append(f"💰 Всего заработано: {total_earnings:.2f} руб")
+        if days_worked > 0:
+            lines.append(f"📈 Среднее в день: {total_earnings / days_worked:.2f} руб")
+        if goal > 0:
+            total = total_earnings + bonus_total
+            percent = round(total / goal * 100)
+            remaining = max(goal - total, 0)
+            lines.append(
+                f"🎯 Цель: {goal:.0f} руб — {percent}% (осталось {remaining:.0f} руб)"
+            )
+        return "\n".join(lines)
 
     def generate_week_details_report(self, work_sessions: Dict[str, Any]) -> str:
         """Генерация детального отчета за неделю"""
