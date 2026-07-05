@@ -31,11 +31,50 @@ CREATE TABLE IF NOT EXISTS synced_entries (
     entry_id TEXT NOT NULL,
     PRIMARY KEY (user_id, entry_id)
 );
+
+CREATE TABLE IF NOT EXISTS bonuses (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    TEXT NOT NULL REFERENCES users(user_id),
+    date       TEXT NOT NULL,
+    amount     REAL NOT NULL,
+    comment    TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bonuses_user_date ON bonuses(user_id, date);
+
+CREATE TABLE IF NOT EXISTS notification_log (
+    user_id  TEXT NOT NULL,
+    kind     TEXT NOT NULL,
+    ref      TEXT NOT NULL,
+    sent_at  TEXT NOT NULL,
+    PRIMARY KEY (user_id, kind, ref)
+);
 """
+
+# Колонки users, появившиеся после первичного релиза SQLite-схемы:
+# существующие базы обновляются через _ensure_columns (ALTER TABLE).
+_USERS_EXTRA_COLUMNS = [
+    ("monthly_goal", "REAL NOT NULL DEFAULT 0"),
+    ("monthly_hours_norm", "REAL NOT NULL DEFAULT 0"),
+    ("notify_daily_digest", "INTEGER NOT NULL DEFAULT 0"),
+    ("digest_time", "TEXT NOT NULL DEFAULT '21:00'"),
+    ("notify_weekly", "INTEGER NOT NULL DEFAULT 0"),
+    ("notify_long_timer", "INTEGER NOT NULL DEFAULT 1"),
+    ("long_timer_hours", "REAL NOT NULL DEFAULT 4"),
+    ("autosync_enabled", "INTEGER NOT NULL DEFAULT 1"),
+]
+
+
+def _ensure_columns(conn: sqlite3.Connection) -> None:
+    existing = {r[1] for r in conn.execute("PRAGMA table_info(users)")}
+    for name, ddl in _USERS_EXTRA_COLUMNS:
+        if name not in existing:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
+    _ensure_columns(conn)
 
 
 def get_connection(db_path: str) -> sqlite3.Connection:
