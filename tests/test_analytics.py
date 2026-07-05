@@ -85,6 +85,19 @@ def test_hours_norm_stats(dm):
     assert sat["expected_by_today"] == fri["expected_by_today"]
 
 
+def test_hours_norm_excludes_holidays(dm):
+    dm.ensure_user("42")
+    dm.set_hours_norm("42", 168)
+    # Июнь 2026: 21 рабочий день (12 июня — праздник, пятница).
+    # К понедельнику 15 июня прошло 10 рабочих дней (11 будней минус праздник).
+    stats = dm.get_hours_norm_stats("42", now=datetime(2026, 6, 15))
+    assert stats["expected_by_today"] == pytest.approx(168 * 10 / 21)
+    # Пятница 12 июня не двигает темп относительно четверга 11-го
+    thu = dm.get_hours_norm_stats("42", now=datetime(2026, 6, 11))
+    fri = dm.get_hours_norm_stats("42", now=datetime(2026, 6, 12))
+    assert fri["expected_by_today"] == thu["expected_by_today"]
+
+
 def test_hours_norm_stats_without_norm(dm):
     dm.ensure_user("42")
     stats = dm.get_hours_norm_stats("42", now=datetime(2026, 7, 5))

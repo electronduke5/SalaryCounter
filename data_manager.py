@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 
 import crypto
 import db
+import production_calendar
 from clickup_client import ClickUpClient
 
 logger = logging.getLogger(__name__)
@@ -309,19 +310,13 @@ class DataManager:
 
     @staticmethod
     def _working_days(year: int, month: int, up_to_day: Optional[int] = None) -> int:
-        """Число рабочих дней (пн–пт) в месяце; up_to_day — включительно до этого числа."""
-        if month == 12:
-            last = 31
-        else:
-            last = (datetime(year, month + 1, 1) - timedelta(days=1)).day
-        last = min(last, up_to_day) if up_to_day else last
-        return sum(
-            1 for d in range(1, last + 1) if datetime(year, month, d).weekday() < 5
-        )
+        """Число рабочих дней в месяце по производственному календарю РФ."""
+        return production_calendar.working_days_in_month(year, month, up_to_day)
 
     def get_hours_norm_stats(self, user_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
         """Норма часов месяца против факта; expected_by_today — норма × доля
-        прошедших рабочих дней (пн–пт), выходные темп не двигают."""
+        прошедших рабочих дней по производственному календарю РФ
+        (выходные и праздники темп не двигают)."""
         now = now or datetime.now()
         norm = self.get_hours_norm(user_id)
         month_prefix = now.strftime("%Y-%m")
