@@ -47,6 +47,26 @@ async def test_sync_inserts_and_dedups(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_sync_handles_taskless_entry_with_string_task(tmp_path, monkeypatch):
+    """ClickUp отдаёт task='0' (строкой) для времени, затреканного без задачи."""
+    dm = _dm(tmp_path, monkeypatch)
+    dm.set_rate("42", 600.0)
+    taskless = {
+        "id": "e-taskless", "duration": str(1000 * 60 * 60),
+        "start": str(int(datetime(2026, 7, 4, 10).timestamp() * 1000)),
+        "task": "0",
+        "description": "",
+    }
+    monkeypatch.setattr(dm, "get_user_clickup_client", lambda uid: FakeClient([taskless]))
+
+    r = await dm.sync_clickup_entries("42", datetime(2026, 7, 1), datetime(2026, 7, 31))
+    assert r["success"], r.get("error")
+    assert r["synced_count"] == 1
+    session = dm.get_work_sessions("42")["2026-07-04"]["sessions"][0]
+    assert session["task_name"] == "Без задачи"
+
+
+@pytest.mark.asyncio
 async def test_sync_skips_negative_duration(tmp_path, monkeypatch):
     dm = _dm(tmp_path, monkeypatch)
     dm.set_rate("42", 600.0)

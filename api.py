@@ -532,7 +532,10 @@ async def clickup_status(user_id: str = Depends(get_current_user)):
 
     active_timer = None
     if current_timer:
-        task_info = current_timer.get("task", {})
+        # ClickUp отдаёт task='0' (строкой) для таймера без привязки к задаче
+        task_info = current_timer.get("task")
+        if not isinstance(task_info, dict):
+            task_info = {}
         start_ms = int(current_timer.get("start", 0))
         active_timer = {
             "task_id": task_info.get("id"),

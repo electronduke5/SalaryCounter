@@ -153,8 +153,9 @@ class BackgroundScheduler:
         if self.dm.was_notified(user_id, KIND_LONG_TIMER, entry_id):
             return
         elapsed_hours = (now_ms - int(timer.get("start", 0))) / MS_PER_HOUR
-        task = timer.get("task") or {}
-        task_name = task.get("name", "Без задачи")
+        # ClickUp отдаёт task='0' (строкой) для таймера без привязки к задаче
+        task = timer.get("task")
+        task_name = task.get("name", "Без задачи") if isinstance(task, dict) else "Без задачи"
         text = (
             f"⏰ Таймер \"{task_name}\" работает уже "
             f"{self.dm.format_hours_minutes(elapsed_hours)}.\n"
