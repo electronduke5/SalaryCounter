@@ -124,6 +124,13 @@ class BackgroundScheduler:
             )
         else:
             text = f"🌙 Итоги дня ({now.strftime('%d.%m')}):\n\nСегодня рабочих сессий не было."
+
+        progress = self.dm.get_month_progress(user_id, now=now)
+        if progress["goal"] > 0:
+            text += (
+                f"\n🎯 Цель месяца: {progress['total']:.0f} из {progress['goal']:.0f} руб "
+                f"({progress['percent']}%)"
+            )
         await self._notify(user_id, KIND_DAILY, today_ref, text)
 
     async def _send_weekly_summary(self, user_id: str, now: datetime) -> None:

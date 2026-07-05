@@ -112,6 +112,22 @@ async def test_tick_autosync_and_daily_digest_once(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_daily_digest_includes_goal_progress(tmp_path, monkeypatch):
+    dm = _dm(tmp_path, monkeypatch)
+    dm.set_rate("42", 600.0)
+    dm.set_clickup_settings("42", api_token="tok", team_id="t")
+    dm.set_notification_settings("42", notify_daily_digest=1)
+    dm.set_monthly_goal("42", 100000)
+    monkeypatch.setattr(dm, "get_user_clickup_client",
+                        lambda uid: FakeClient(entries=[_entry("e1", (5, 10), 1.5)]))
+
+    bot = FakeBot()
+    await BackgroundScheduler(dm, bot)._tick(datetime(2026, 7, 5, 21, 5))
+    digest = next(t for _, t in bot.sent if "Итоги дня" in t)
+    assert "Цель" in digest and "1%" in digest
+
+
+@pytest.mark.asyncio
 async def test_tick_weekly_summary_on_sunday(tmp_path, monkeypatch):
     dm = _dm(tmp_path, monkeypatch)
     dm.set_rate("42", 600.0)
